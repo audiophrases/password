@@ -1,1 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Password — ESL word game</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===================== SETUP ===================== -->
+  <section id="setup" class="screen">
+    <header class="setup-head">
+      <h1>Password <span>· ESL word game</span></h1>
+      <p class="sub">Build a round, then play it in class — single player or hot-seat multiplayer.</p>
+    </header>
 
+    <div class="setup-grid">
+      <!-- 1. Generate words via any chatbot -->
+      <div class="card">
+        <h2>1 · Generate the words</h2>
+        <div class="field-row">
+          <label>Language
+            <select id="language">
+              <option value="en-US" data-name="English (American)" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" selected>American English</option>
+              <option value="ca-ES" data-name="Catalan" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Catalan</option>
+              <option value="fr-FR" data-name="French" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">French</option>
+              <option value="es-ES" data-name="Spanish (Spain)" data-letters="ABCDEFGHIJKLMNÑOPQRSTUVWXYZ">Spanish (Spain)</option>
+            </select>
+          </label>
+          <label>Level
+            <select id="level">
+              <option>A1</option><option selected>A2</option><option>B1</option>
+              <option>B2</option><option>C1</option>
+            </select>
+          </label>
+          <label>Players <input id="num-players" type="number" value="1" min="1" max="6" /></label>
+        </div>
+        <label>Topic / theme <input id="topic" type="text" value="everyday vocabulary" /></label>
+        <div class="field-row">
+          <label>Letters <input id="letters" type="text" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" /></label>
+          <label>Seconds <input id="duration" type="number" value="200" min="30" max="600" /></label>
+        </div>
+        <label>Voice (read-aloud)
+          <span class="voice-pick">
+            <select id="voice"></select>
+            <button id="test-voice" class="btn ghost small" type="button" title="Test voice">▶</button>
+          </span>
+        </label>
+        <button id="build-prompt" class="btn">Build chatbot prompt</button>
+        <textarea id="prompt-output" class="mono" rows="5" placeholder="Your prompt appears here — paste it into ChatGPT / Claude / any chatbot."></textarea>
+        <button id="copy-prompt" class="btn ghost">Copy prompt</button>
+      </div>
+
+      <!-- 2. Load the JSON it returns -->
+      <div class="card">
+        <h2>2 · Load the game</h2>
+        <p class="hint">Paste the JSON the chatbot returns — or load a <b>.txt</b> / <b>.json</b> file:</p>
+        <textarea id="json-input" class="mono" rows="8" placeholder='{ "title": "...", "letters": [ ... ] }'></textarea>
+        <div class="field-row">
+          <button id="load-json" class="btn">Load JSON</button>
+          <button id="load-file" class="btn ghost">Load file</button>
+          <button id="load-sample" class="btn ghost">Try sample round</button>
+        </div>
+        <input id="file-input" type="file" accept=".txt,.json,text/plain,application/json" hidden />
+        <div id="validation" class="msg"></div>
+      </div>
+
+      <!-- 3. Players & rules -->
+      <div class="card">
+        <h2>3 · Players &amp; rules</h2>
+        <p class="hint">Set the number of players in section 1; name them here.</p>
+        <div id="players-list"></div>
+        <hr />
+        <label>Judging mode
+          <select id="mode">
+            <option value="voice-assist">Voice-assist (ASR suggests, you confirm)</option>
+            <option value="voice-auto">Voice-auto (auto-accept confident answers)</option>
+            <option value="teacher-judge">Teacher-judge (no mic, you decide)</option>
+            <option value="type-in">Type-in (typed answers)</option>
+          </select>
+        </label>
+        <label class="slider">Strictness <input id="strictness" type="range" min="0" max="1" step="0.05" value="0.7" />
+          <output id="strictness-out">0.7</output>
+        </label>
+        <label class="check"><input id="auto-read" type="checkbox" /> Read clues aloud automatically</label>
+        <p id="speech-note" class="hint"></p>
+        <button id="start-game" class="btn primary" disabled>▶ Start game</button>
+      </div>
+    </div>
+    <footer class="legend">Keys in game: <b>C</b> correct · <b>X</b> wrong · <b>Space</b> pass · hold <b>V</b> to talk · <b>Enter</b> confirm · <b>F</b> fullscreen · <b>P</b> pause</footer>
+  </section>
+
+  <!-- ===================== GAME ===================== -->
+  <section id="game" class="screen hidden">
+    <div id="hud">
+      <span id="hud-name" class="hud-name"></span>
+      <span id="hud-time" class="hud-time">00:00</span>
+      <span id="hud-score" class="hud-score">0/0</span>
+    </div>
+
+    <div id="stage"></div>
+    <video id="cam" autoplay muted playsinline></video>
+
+    <div id="clue">
+      <div class="clue-left"><span id="clue-letter">A</span><small id="clue-kind">Starts with A</small></div>
+      <p id="clue-text" class="clue-text"></p>
+    </div>
+
+    <div id="heard" class="heard"></div>
+    <div id="suggestion" class="suggestion"></div>
+
+    <div id="controls">
+      <button id="mic" class="ctrl mic" title="Hold to talk (or hold V)">🎤 Hold to talk</button>
+      <input id="type-answer" class="type-answer" type="text" placeholder="type answer… (Enter)" />
+      <button id="btn-correct" class="ctrl ok" title="C">✓</button>
+      <button id="btn-pass" class="ctrl pass" title="Space">⏭</button>
+      <button id="btn-wrong" class="ctrl no" title="X">✕</button>
+      <button id="read-clue" class="ctrl util" title="Read clue aloud">🔊</button>
+      <button id="camera-toggle" class="ctrl util" title="Toggle camera">📷</button>
+      <button id="fullscreen" class="ctrl util" title="Fullscreen (F)">⛶</button>
+      <button id="pause" class="ctrl util">⏸ Pause</button>
+      <button id="exit" class="ctrl util">Exit</button>
+    </div>
+
+    <div id="result" class="overlay hidden">
+      <div class="result-card">
+        <h2>Round over</h2>
+        <div id="result-body"></div>
+        <button id="result-again" class="btn primary">Back to setup</button>
+      </div>
+    </div>
+  </section>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
