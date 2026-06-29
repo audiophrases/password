@@ -43,7 +43,7 @@ In other browsers it falls back to whatever voices are installed.
 | Key | Action |
 |-----|--------|
 | `C` | mark correct |
-| `X` | mark wrong |
+| `W` | mark wrong |
 | `Space` | pass — requeues the letter for later, next turn |
 | hold `V` (or hold the 🎤 button) | push-to-talk speech recognition |
 | `Enter` | confirm the speech suggestion |

@@ -294,10 +294,10 @@ function onHypotheses(hyps) {
   const pct = Math.round(score * 100);
   box.textContent =
     decision === 'correct'
-      ? `Looks correct (${pct}%). Press Enter / C to confirm, X to reject.`
+      ? `Looks correct (${pct}%). Press Enter / C to confirm, W to reject.`
       : decision === 'review'
-      ? `Not sure (${pct}%). Enter to accept, X to reject.`
-      : `Sounds wrong (${pct}%). Enter / X to confirm, C to accept anyway.`;
+      ? `Not sure (${pct}%). Enter to accept, W to reject.`
+      : `Sounds wrong (${pct}%). Enter / W to confirm, C to accept anyway.`;
 }
 
 // ---------- input (the teacher is always the final judge) ----------
@@ -345,7 +345,7 @@ function bindGameControls() {
     if (document.activeElement === $('type-answer')) return;
     switch (e.key.toLowerCase()) {
       case 'c': state.game.correct(); break;
-      case 'x': state.game.wrong(); break;
+      case 'w': state.game.wrong(); break;
       case ' ': e.preventDefault(); state.game.pass(); break;
       case 'enter':
         if (state.lastSuggestion === 'wrong') state.game.wrong();
