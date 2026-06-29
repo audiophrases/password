@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Password — Remote</title>
+  <link rel="stylesheet" href="remote.css" />
+</head>
+<body class="offline">
+  <div id="status" class="status">Connecting…</div>
+
+  <div id="ctx" class="ctx">
+    <div class="ctx-top">
+      <span id="r-player" class="r-player"></span>
+      <span id="r-time" class="r-time"></span>
+      <span id="r-score" class="r-score"></span>
+    </div>
+    <div class="ctx-letter"><span id="r-letter"></span><small id="r-kind"></small></div>
+    <p id="r-clue" class="ctx-clue">Open this page on your phone while the game runs on the laptop.</p>
+    <div id="r-sugg" class="ctx-sugg"></div>
+  </div>
+
+  <div class="pad">
+    <button class="big ok"   data-act="correct">✓<small>Correct</small></button>
+    <button class="big pass" data-act="pass">⏭<small>Pass</small></button>
+    <button class="big no"   data-act="wrong">✕<small>Wrong</small></button>
+  </div>
+
+  <button id="talk" class="talk">🎤 Hold to talk</button>
+
+  <div class="row2">
+    <button data-act="start">▶ Start</button>
+    <button data-act="read">🔊 Clue</button>
+    <button data-act="pause">⏸ Pause</button>
+    <button data-act="camera">📷 Cam</button>
+    <button data-act="fullscreen">⛶ Full</button>
+    <button data-act="exit">Exit</button>
+  </div>
+
+  <script type="module" src="js/remote.js"></script>
+</body>
+</html>

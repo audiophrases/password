@@ -8,15 +8,18 @@ No build step. Pure static site — deploy to GitHub Pages or run from a folder.
 
 ## Run locally
 
-ES modules + the sample loader need to be served over HTTP (not opened as a `file://`):
+Run the included server (Node, **no dependencies — no `npm install`**). This also enables
+the phone remote:
 
 ```bash
-# from this folder
-python -m http.server 8000
-# then open http://localhost:8000
+node server.js
+#   Game (this laptop):  http://localhost:8000
+#   Phone remote:        http://<your-LAN-IP>:8000/remote   (printed on start)
 ```
 
-(Or use VS Code "Live Server", or just push to GitHub Pages — this repo is Pages-ready.)
+The static files also work under any plain static host (e.g. `python -m http.server`) or
+GitHub Pages — but the **phone remote needs `node server.js`** (a static host can't relay
+WebSocket traffic).
 
 ## Languages & voices
 
@@ -77,6 +80,25 @@ Toggle 📷 in game to put the active student's webcam in the center of their le
 answering — their circle grows to the center while the others shrink to the corners. `F` makes
 it fullscreen for the projector.
 
+## Phone remote (control from across the room)
+
+Run `node server.js`, then on your phone open the `http://<LAN-IP>:8000/remote` URL it prints
+(also shown on the setup screen). Phone and laptop must be on the **same network** — same
+Wi-Fi, or join the laptop to your phone's hotspot.
+
+You get big **Correct / Pass / Wrong** buttons, **hold-to-talk**, and Start / Pause / Clue /
+Camera / Fullscreen / Exit — plus the current player, letter, clue, score and timer mirrored
+on the phone (so you can read the clue without looking at the projector). Presses travel phone
+→ laptop over the local network in a few milliseconds; **no internet needed.** After that one
+URL the laptop is untouched: students watch the projected circle while you drive from the phone.
+
+How it works: `server.js` is a tiny WebSocket relay. The game tab connects as the "host"; the
+phone connects as a "remote" and its taps are forwarded to the host. A browser tab can't accept
+connections itself, so the relay is the rendezvous.
+
+> If the school Wi-Fi blocks device-to-device traffic ("client isolation"), turn on your phone's
+> hotspot and join the laptop to it — same private network, no internet required.
+
 ## Game JSON schema
 
 ```json
@@ -106,4 +128,7 @@ it fullscreen for the projector.
 | `js/speech.js` | Web Speech recognition (alternatives) + synthesis |
 | `js/camera.js` | webcam for the center-of-circle projector look |
 | `js/ai.js` | prompt builder + JSON validation |
+| `server.js` | static server + WebSocket relay for the phone remote (no deps) |
+| `remote.html` / `remote.css` / `js/remote.js` | the phone controller page |
+| `js/link.js` | WebSocket client shared by the game and the remote |
 | `sample-game.json` | a ready-to-play A2 round |

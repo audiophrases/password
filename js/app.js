@@ -5,6 +5,7 @@ import { Circle } from './circle.js';
 import { Recognizer, recognitionSupported, speak, stopSpeaking, voicesFor, onVoices } from './speech.js';
 import { scoreAnswer } from './match.js';
 import { Camera, toggleFullscreen } from './camera.js';
+import { connect } from './link.js';
 
 const $ = (id) => document.getElementById(id);
 const PLAYER_COLORS = ['#e8632c', '#1f9d55', '#2b6cb0', '#9b2c98', '#b7791f', '#0d9488'];
@@ -13,12 +14,16 @@ const state = {
   game: null,
   data: null,
   circles: [],
+  players: [],
   recognizer: null,
   camera: new Camera(),
   cameraOn: false,
   autoRead: false,
   voiceName: null,
   lastSuggestion: null,
+  link: null,
+  remoteUrl: '',
+  remotes: 0,
 };
 
 // ---------- Setup screen ----------
@@ -73,6 +78,7 @@ function populateVoices(langCode) {
 
 function setupScreen() {
   const players = defaultPlayers();
+  state.players = players;
   renderPlayers(players);
 
   // Number of players (source of truth lives in section 1).
@@ -147,9 +153,7 @@ function setupScreen() {
     }
   });
 
-  $('start-game').addEventListener('click', () => {
-    if (state.data) startGame(players);
-  });
+  $('start-game').addEventListener('click', beginGame);
 
   $('speech-note').textContent = recognitionSupported()
     ? 'Tip: open in Microsoft Edge for the most natural (neural) read-aloud voices.'
@@ -173,12 +177,105 @@ function loadGameText(text, players) {
   msg.className = 'msg ok';
   msg.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
   $('start-game').disabled = false;
+  pushRemoteState();
 }
 
 function flash(btn, text) {
   const old = btn.textContent;
   btn.textContent = text;
   setTimeout(() => (btn.textContent = old), 1200);
+}
+
+function beginGame() {
+  if (state.data && $('game').classList.contains('hidden')) startGame(state.players);
+}
+
+// ---------- Phone remote (companion controller over the local relay) ----------
+
+async function initRemoteLink() {
+  let info = null;
+  try {
+    const r = await fetch('/lan-info');
+    if (r.ok) info = await r.json();
+  } catch {
+    /* relay not running */
+  }
+  if (!info) {
+    if ($('remote-info')) $('remote-info').textContent = 'Phone remote: run “node server.js” on the laptop to enable it.';
+    return;
+  }
+  state.remoteUrl = `http://${info.ip}:${info.port}/remote`;
+  state.link = connect({
+    role: 'host',
+    onCmd: handleRemoteCommand,
+    onPeers: (m) => {
+      state.remotes = m.remotes;
+      renderRemoteInfo();
+    },
+    onStatus: (s) => {
+      if (s === 'open') pushRemoteState();
+    },
+  });
+  renderRemoteInfo();
+}
+
+function renderRemoteInfo() {
+  const el = $('remote-info');
+  if (!el || !state.remoteUrl) return;
+  const conn = state.remotes > 0 ? `connected: ${state.remotes} 📱` : 'waiting for phone…';
+  el.innerHTML = `📱 Phone remote — open <b>${state.remoteUrl}</b> on the same Wi‑Fi · ${conn}`;
+}
+
+// Map a remote button to the same actions as the keyboard/on-screen controls.
+function handleRemoteCommand(action) {
+  const g = state.game;
+  const inGame = g && !$('game').classList.contains('hidden');
+  switch (action) {
+    case 'correct': if (inGame) g.correct(); break;
+    case 'wrong': if (inGame) g.wrong(); break;
+    case 'pass': if (inGame) g.pass(); break;
+    case 'talk-start': if (inGame) startTalk(); break;
+    case 'talk-stop': stopTalk(); break;
+    case 'read': if (inGame) speak(g.currentEntry?.clue, g.data.langCode, state.voiceName); break;
+    case 'camera': if (inGame) toggleCamera(); break;
+    case 'fullscreen': toggleFullscreen($('game')); break;
+    case 'start': beginGame(); break;
+    case 'exit': if (inGame) endToSetup(); break;
+    case 'pause':
+      if (inGame) {
+        g.togglePause();
+        $('pause').textContent = g.paused ? '▶ Resume' : '⏸ Pause';
+        pushRemoteState();
+      }
+      break;
+  }
+}
+
+// Push current game context to any connected phones.
+function pushRemoteState() {
+  if (!state.link) return;
+  const g = state.game;
+  const inGame = g && !$('game').classList.contains('hidden');
+  if (!inGame) {
+    state.link.send({ t: 'state', screen: 'setup', loaded: !!state.data, title: state.data?.title || null });
+    return;
+  }
+  const p = g.active;
+  const e = g.currentEntry;
+  state.link.send({
+    t: 'state',
+    screen: 'game',
+    player: p.name,
+    color: p.color,
+    time: p.timeLeft,
+    score: g.score(p),
+    total: g.order.length,
+    letter: e ? e.letter : '',
+    kind: e ? (e.type === 'contains' ? `Contains ${e.letter}` : `Starts with ${e.letter}`) : '',
+    clue: e ? e.clue : '',
+    paused: g.paused,
+    suggestion: state.lastSuggestion || '',
+  });
 }
 
 // ---------- Game screen ----------
@@ -263,6 +360,7 @@ function renderHud() {
   $('hud-time').textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
   $('hud-time').classList.toggle('low', t <= 15);
   $('hud-score').textContent = `${game.score(p)}/${game.order.length}`;
+  pushRemoteState();
 }
 
 function renderClue() {
@@ -298,6 +396,7 @@ function onHypotheses(hyps) {
       : decision === 'review'
       ? `Not sure (${pct}%). Enter to accept, W to reject.`
       : `Sounds wrong (${pct}%). Enter / W to confirm, C to accept anyway.`;
+  pushRemoteState();
 }
 
 // ---------- input (the teacher is always the final judge) ----------
@@ -399,10 +498,12 @@ function endToSetup() {
   $('result').classList.add('hidden');
   $('game').classList.add('hidden');
   $('setup').classList.remove('hidden');
+  pushRemoteState();
 }
 
 // ---------- boot ----------
 setupScreen();
 bindGameControls();
+initRemoteLink();
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
 $('auto-read')?.addEventListener('change', (e) => (state.autoRead = e.target.checked));

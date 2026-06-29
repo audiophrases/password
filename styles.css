@@ -78,6 +78,8 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 .swatch { width: 18px; height: 18px; border-radius: 50%; flex: none; }
 .p-del { background: none; border: none; color: var(--muted); font-size: 14px; }
 
+.remote-info { margin: 4px 0 10px; word-break: break-all; }
+.remote-info b { color: var(--ink); }
 .legend { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 0 28px; }
 .legend b { color: var(--ink); }
 
