@@ -93,21 +93,60 @@ export function validateGame(obj) {
   return { ok: true, errors: [], game };
 }
 
-// Tolerant parse: accepts raw JSON or JSON wrapped in ```json fences / surrounding prose.
+// Replace raw control characters that sit *inside* string literals (e.g. line
+// breaks from a wrapped paste, which JSON forbids) with spaces, so hand-pasted
+// JSON still loads.
+function softenControlChars(s) {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (esc) {
+      out += ch;
+      esc = false;
+    } else if (ch === '\\') {
+      out += ch;
+      esc = true;
+    } else if (ch === '"') {
+      inStr = !inStr;
+      out += ch;
+    } else if (inStr && ch.charCodeAt(0) < 0x20) {
+      out += ' ';
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+// Tolerant parse: accepts raw JSON, ```json fences, surrounding prose, an outer
+// [ ... ] array wrapper (uses the first element), and wrapped/multiline strings.
 export function parseGameText(text) {
   let raw = (text || '').trim();
   const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fence) raw = fence[1].trim();
-  if (raw[0] !== '{') {
-    const start = raw.indexOf('{');
-    const end = raw.lastIndexOf('}');
-    if (start !== -1 && end !== -1) raw = raw.slice(start, end + 1);
+
+  // Slice to the outermost JSON value if there's surrounding prose.
+  const objAt = raw.indexOf('{');
+  const arrAt = raw.indexOf('[');
+  let startChar = '{';
+  let startIdx = objAt;
+  if (arrAt !== -1 && (objAt === -1 || arrAt < objAt)) {
+    startChar = '[';
+    startIdx = arrAt;
   }
+  const endIdx = raw.lastIndexOf(startChar === '{' ? '}' : ']');
+  if (startIdx !== -1 && endIdx > startIdx) raw = raw.slice(startIdx, endIdx + 1);
+
+  raw = softenControlChars(raw);
+
   let obj;
   try {
     obj = JSON.parse(raw);
   } catch (e) {
     return { ok: false, errors: ['Could not parse JSON: ' + e.message] };
   }
+  if (Array.isArray(obj)) obj = obj[0]; // tolerate an outer array wrapper
   return validateGame(obj);
 }
