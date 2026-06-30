@@ -805,16 +805,19 @@ function renderHud() {
 }
 
 // Spoken lead-in per language, e.g. "Begins with the letter R. <clue>".
+// `sep` goes between the lead and the letter: a space for English (smooth), but
+// a sentence break for romance languages where "letra/lletra/lettre" ends in a
+// vowel and would otherwise slur into the letter (e.g. "la lletra A" -> "lletraa").
 const SAY_PREFIX = {
-  en: { starts: 'Begins with the letter', contains: 'Contains the letter' },
-  es: { starts: 'Empieza por la letra', contains: 'Contiene la letra' },
-  fr: { starts: 'Commence par la lettre', contains: 'Contient la lettre' },
-  ca: { starts: 'Comença per la lletra', contains: 'Conté la lletra' },
+  en: { starts: 'Begins with the letter', contains: 'Contains the letter', sep: ' ' },
+  es: { starts: 'Empieza por la letra', contains: 'Contiene la letra', sep: '. ' },
+  fr: { starts: 'Commence par la lettre', contains: 'Contient la lettre', sep: '. ' },
+  ca: { starts: 'Comença per la lletra', contains: 'Conté la lletra', sep: '. ' },
 };
 function spokenClue(entry, langCode) {
   const set = SAY_PREFIX[(langCode || 'en').slice(0, 2).toLowerCase()] || SAY_PREFIX.en;
   const lead = set[entry.type === 'contains' ? 'contains' : 'starts'];
-  return `${lead} ${entry.letter}. ${entry.clue}`;
+  return `${lead}${set.sep}${entry.letter}. ${entry.clue}`;
 }
 function readCurrentClue() {
   const e = state.game?.currentEntry;
