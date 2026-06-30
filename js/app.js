@@ -236,7 +236,8 @@ function handleRemoteCommand(action) {
     case 'pass': if (inGame) g.pass(); break;
     case 'talk-start': if (inGame) startTalk(); break;
     case 'talk-stop': stopTalk(); break;
-    case 'read': if (inGame) speak(g.currentEntry?.clue, g.data.langCode, state.voiceName); break;
+    case 'read': if (inGame) readCurrentClue(); break;
+    case 'toggle-clue': if (inGame) toggleClue(); break;
     case 'camera': if (inGame) toggleCamera(); break;
     case 'fullscreen': toggleFullscreen($('game')); break;
     case 'start': beginGame(); break;
@@ -363,6 +364,35 @@ function renderHud() {
   pushRemoteState();
 }
 
+// Spoken lead-in per language, e.g. "Begins with the letter R. <clue>".
+const SAY_PREFIX = {
+  en: { starts: 'Begins with the letter', contains: 'Contains the letter' },
+  es: { starts: 'Empieza por la letra', contains: 'Contiene la letra' },
+  fr: { starts: 'Commence par la lettre', contains: 'Contient la lettre' },
+  ca: { starts: 'Comença per la lletra', contains: 'Conté la lletra' },
+};
+function spokenClue(entry, langCode) {
+  const set = SAY_PREFIX[(langCode || 'en').slice(0, 2).toLowerCase()] || SAY_PREFIX.en;
+  const lead = set[entry.type === 'contains' ? 'contains' : 'starts'];
+  return `${lead} ${entry.letter}. ${entry.clue}`;
+}
+function readCurrentClue() {
+  const e = state.game?.currentEntry;
+  if (e) speak(spokenClue(e, state.game.data.langCode), state.game.data.langCode, state.voiceName);
+}
+
+// Hide/show the written definition so the round can be played from audio only.
+function toggleClue() {
+  const hidden = document.body.classList.toggle('clue-hidden');
+  const btn = $('toggle-clue');
+  if (btn) {
+    btn.textContent = hidden ? '🙈' : '👁';
+    btn.title = hidden ? 'Show definition' : 'Hide definition (audio only)';
+  }
+  // switching to audio-only mid-letter: speak the current clue right away
+  if (hidden && state.game && !$('game').classList.contains('hidden')) readCurrentClue();
+}
+
 function renderClue() {
   const entry = state.game.currentEntry;
   if (!entry) return;
@@ -371,7 +401,8 @@ function renderClue() {
   $('clue-kind').textContent = `${verb} ${entry.letter}`;
   $('clue-text').textContent = entry.clue;
   $('type-answer').value = '';
-  if (state.autoRead) speak(entry.clue, state.game.data.langCode, state.voiceName);
+  // narrate automatically when auto-read is on, or when the text is hidden
+  if (state.autoRead || document.body.classList.contains('clue-hidden')) readCurrentClue();
 }
 
 function onHypotheses(hyps) {
@@ -422,7 +453,8 @@ function bindGameControls() {
     $('pause').textContent = state.game.paused ? '▶ Resume' : '⏸ Pause';
   });
   $('exit').addEventListener('click', endToSetup);
-  $('read-clue').addEventListener('click', () => speak(state.game.currentEntry?.clue, state.game.data.langCode, state.voiceName));
+  $('read-clue').addEventListener('click', readCurrentClue);
+  $('toggle-clue').addEventListener('click', toggleClue);
   $('fullscreen').addEventListener('click', () => toggleFullscreen($('game')));
   $('camera-toggle').addEventListener('click', toggleCamera);
 
@@ -455,6 +487,7 @@ function bindGameControls() {
         break;
       case 'f': toggleFullscreen($('game')); break;
       case 'p': state.game.togglePause(); break;
+      case 'h': toggleClue(); break;
     }
   });
   document.addEventListener('keyup', (e) => {

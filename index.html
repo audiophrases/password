@@ -88,7 +88,7 @@
         <button id="start-game" class="btn primary" disabled>▶ Start game</button>
       </div>
     </div>
-    <footer class="legend">Keys in game: <b>C</b> correct · <b>W</b> wrong · <b>Space</b> pass · hold <b>V</b> to talk · <b>Enter</b> confirm · <b>F</b> fullscreen · <b>P</b> pause</footer>
+    <footer class="legend">Keys in game: <b>C</b> correct · <b>W</b> wrong · <b>Space</b> pass · hold <b>V</b> to talk · <b>Enter</b> confirm · <b>H</b> hide text · <b>F</b> fullscreen · <b>P</b> pause</footer>
   </section>
 
   <!-- ===================== GAME ===================== -->
@@ -105,6 +105,7 @@
     <div id="clue">
       <div class="clue-left"><span id="clue-letter">A</span><small id="clue-kind">Starts with A</small></div>
       <p id="clue-text" class="clue-text"></p>
+      <span id="clue-listen" class="clue-listen">🔊 listen</span>
     </div>
 
     <div id="heard" class="heard"></div>
@@ -117,6 +118,7 @@
       <button id="btn-pass" class="ctrl pass" title="Space">⏭</button>
       <button id="btn-wrong" class="ctrl no" title="W">✕</button>
       <button id="read-clue" class="ctrl util" title="Read clue aloud">🔊</button>
+      <button id="toggle-clue" class="ctrl util" title="Hide definition (audio only)">👁</button>
       <button id="camera-toggle" class="ctrl util" title="Toggle camera">📷</button>
       <button id="fullscreen" class="ctrl util" title="Fullscreen (F)">⛶</button>
       <button id="pause" class="ctrl util">⏸ Pause</button>

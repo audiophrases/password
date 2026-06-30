@@ -32,6 +32,11 @@ Microsoft's "… Online (Natural)" voices (the same engine as Edge Read Aloud) �
 the best natural voice per language, and you can override it (and press ▶ to test) in section 1.
 In other browsers it falls back to whatever voices are installed.
 
+**Audio-only mode:** the 👁 button (or `H`, or 👁 Text on the phone) hides the written
+definition so students rely on listening. When hidden, each clue is read aloud automatically,
+announced with the letter in the game's language — e.g. *"Begins with the letter R…"*,
+*"Empieza por la letra R…"*, *"Comença per la lletra R…"*. The 🔊 button reads it on demand.
+
 ## How a round works
 
 1. **Generate the words.** On the setup screen pick language / level / topic / letters / number of
@@ -50,6 +55,7 @@ In other browsers it falls back to whatever voices are installed.
 | `Space` | pass — requeues the letter for later, next turn |
 | hold `V` (or hold the 🎤 button) | push-to-talk speech recognition |
 | `Enter` | confirm the speech suggestion |
+| `H` | hide/show the written definition (audio-only mode) |
 | `F` | fullscreen (projector) · `P` pause |
 
 ## Speech recognition strategy (the hard part)
