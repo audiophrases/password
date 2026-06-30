@@ -34,6 +34,7 @@ const state = {
   neuralAvailable: false,
   useNeural: false,
   neuralBroken: false,
+  edit: { set: 0, sets: 1 },
   lastSuggestion: null,
   link: null,
   remoteUrl: '',
@@ -201,6 +202,7 @@ function setupScreen() {
       letters: letters.length ? letters : ALPHABET_EN,
       langCode: opt.value,
       durationSec: +$('duration').value || 200,
+      players: state.players.length,
     });
     $('prompt-output').value = prompt;
   });
@@ -272,7 +274,9 @@ function lettersForLang(langCode) {
   return (opt?.dataset.letters || ALPHABET_EN.join('')).toUpperCase().replace(/[^A-ZÑ]/g, '').split('');
 }
 
-function editorRowEl({ letter = '', type = 'starts', answer = '', accept = '', clue = '' } = {}) {
+// Each row carries every player's variant on row._variants; the inputs show the
+// currently selected set (state.edit.set). letter/type are shared across sets.
+function editorRowEl({ letter = '', type = 'starts', variants = [] } = {}) {
   const row = document.createElement('div');
   row.className = 'erow';
   row.innerHTML = `
@@ -281,19 +285,67 @@ function editorRowEl({ letter = '', type = 'starts', answer = '', accept = '', c
       <option value="starts">starts with</option>
       <option value="contains">contains</option>
     </select>
-    <input class="e-answer" value="${esc(answer)}" placeholder="answer" />
-    <input class="e-accept" value="${esc(accept)}" placeholder="also accept (comma-separated)" />
-    <input class="e-clue" value="${esc(clue)}" placeholder="clue / definition" />
-    <button class="e-del" title="Remove">✕</button>`;
+    <input class="e-answer" placeholder="answer" />
+    <input class="e-accept" placeholder="also accept (comma-separated)" />
+    <input class="e-clue" placeholder="clue / definition" />
+    <button class="e-del" title="Remove letter">✕</button>`;
   row.querySelector('.e-type').value = type === 'contains' ? 'contains' : 'starts';
+  row._variants = variants.map((v) => ({ answer: v.answer || '', accept: v.accept || '', clue: v.clue || '' }));
+  while (row._variants.length < state.edit.sets) row._variants.push({ answer: '', accept: '', clue: '' });
+  applyVariantToRow(row, state.edit.set);
   row.querySelector('.e-del').addEventListener('click', () => row.remove());
   return row;
 }
 
-function renderEditorRows(list) {
-  const c = $('editor-rows');
-  c.innerHTML = '';
-  list.forEach((r) => c.appendChild(editorRowEl(r)));
+function applyVariantToRow(row, set) {
+  const v = row._variants[set] || { answer: '', accept: '', clue: '' };
+  row.querySelector('.e-answer').value = v.answer || '';
+  row.querySelector('.e-accept').value = v.accept || '';
+  row.querySelector('.e-clue').value = v.clue || '';
+}
+
+// Copy the visible inputs back into each row's current variant.
+function stashVisibleSet() {
+  const set = state.edit.set;
+  $('editor-rows').querySelectorAll('.erow').forEach((row) => {
+    row._variants[set] = {
+      answer: row.querySelector('.e-answer').value,
+      accept: row.querySelector('.e-accept').value,
+      clue: row.querySelector('.e-clue').value,
+    };
+  });
+}
+
+function updateSetLabel() {
+  const lbl = $('editor-set-label');
+  if (lbl) lbl.textContent = `${state.edit.set + 1} / ${state.edit.sets}`;
+  if ($('editor-set-del')) $('editor-set-del').disabled = state.edit.sets <= 1;
+}
+
+function setEditorSet(index) {
+  if (index < 0 || index >= state.edit.sets) return;
+  stashVisibleSet();
+  state.edit.set = index;
+  $('editor-rows').querySelectorAll('.erow').forEach((row) => applyVariantToRow(row, index));
+  updateSetLabel();
+}
+
+function addSet() {
+  stashVisibleSet();
+  state.edit.sets += 1;
+  $('editor-rows').querySelectorAll('.erow').forEach((row) => row._variants.push({ answer: '', accept: '', clue: '' }));
+  setEditorSet(state.edit.sets - 1);
+}
+
+function removeSet() {
+  if (state.edit.sets <= 1) return;
+  stashVisibleSet();
+  const idx = state.edit.set;
+  $('editor-rows').querySelectorAll('.erow').forEach((row) => row._variants.splice(idx, 1));
+  state.edit.sets -= 1;
+  state.edit.set = Math.min(idx, state.edit.sets - 1);
+  $('editor-rows').querySelectorAll('.erow').forEach((row) => applyVariantToRow(row, state.edit.set));
+  updateSetLabel();
 }
 
 // Open the editor pre-filled from the loaded game, or blank (blank === true for a new game).
@@ -303,10 +355,29 @@ function openEditor(blank) {
   const lang = $('editor-lang');
   const known = [...lang.options].map((o) => o.value);
   lang.value = data && known.includes(data.langCode) ? data.langCode : $('language').value;
-  const rows = data?.letters?.length
-    ? data.letters.map((l) => ({ letter: l.letter, type: l.type, answer: l.answer, accept: (l.accept || []).join(', '), clue: l.clue }))
-    : lettersForLang(lang.value).map((ch) => ({ letter: ch, type: 'starts', answer: '', accept: '', clue: '' }));
-  renderEditorRows(rows);
+
+  let rows;
+  if (data?.letters?.length) {
+    state.edit = { set: 0, sets: Math.max(1, ...data.letters.map((l) => (l.variants ? l.variants.length : 1))) };
+    rows = data.letters.map((l) => ({
+      letter: l.letter,
+      type: l.type,
+      variants: (l.variants || [{ answer: l.answer, accept: l.accept, clue: l.clue }]).map((v) => ({
+        answer: v.answer || '',
+        accept: (v.accept || []).join(', '),
+        clue: v.clue || '',
+      })),
+    }));
+  } else {
+    // new game: one word set per player so each gets different words
+    state.edit = { set: 0, sets: Math.max(1, state.players.length) };
+    rows = lettersForLang(lang.value).map((ch) => ({ letter: ch, type: 'starts', variants: [] }));
+  }
+
+  const box = $('editor-rows');
+  box.innerHTML = '';
+  rows.forEach((r) => box.appendChild(editorRowEl(r)));
+  updateSetLabel();
   $('editor-msg').textContent = '';
   $('editor-msg').className = 'msg';
   $('setup').classList.add('hidden');
@@ -314,6 +385,7 @@ function openEditor(blank) {
 }
 
 function scaffoldEditor() {
+  stashVisibleSet();
   const present = new Set([...$('editor-rows').querySelectorAll('.e-letter')].map((i) => i.value.trim().toUpperCase()));
   lettersForLang($('editor-lang').value).forEach((ch) => {
     if (!present.has(ch)) $('editor-rows').appendChild(editorRowEl({ letter: ch }));
@@ -327,14 +399,17 @@ function closeEditor() {
 
 // Collect + validate the editor into state.data; returns true on success.
 function saveEditorData() {
+  stashVisibleSet();
   const opt = $('editor-lang').selectedOptions[0];
   const letters = [...$('editor-rows').querySelectorAll('.erow')]
     .map((row) => ({
       letter: row.querySelector('.e-letter').value.trim().toUpperCase(),
       type: row.querySelector('.e-type').value,
-      answer: row.querySelector('.e-answer').value.trim(),
-      accept: row.querySelector('.e-accept').value.split(',').map((s) => s.trim()).filter(Boolean),
-      clue: row.querySelector('.e-clue').value.trim(),
+      variants: row._variants.map((v) => ({
+        answer: (v.answer || '').trim(),
+        accept: (v.accept || '').split(',').map((s) => s.trim()).filter(Boolean),
+        clue: (v.clue || '').trim(),
+      })),
     }))
     .filter((l) => l.letter);
 
@@ -344,10 +419,18 @@ function saveEditorData() {
     msg.textContent = 'Add at least one letter.';
     return false;
   }
-  const incomplete = letters.filter((l) => !l.answer || !l.clue).map((l) => l.letter);
+  const incomplete = [];
+  for (const l of letters) {
+    for (const v of l.variants) {
+      if (!v.answer || !v.clue) {
+        incomplete.push(l.letter);
+        break;
+      }
+    }
+  }
   if (incomplete.length) {
     msg.className = 'msg error';
-    msg.textContent = `Add an answer and a clue for: ${incomplete.join(', ')}`;
+    msg.textContent = `Add an answer and a clue for every set of: ${[...new Set(incomplete)].join(', ')}`;
     return false;
   }
 
@@ -475,6 +558,10 @@ function bindEditor() {
   $('save-local').addEventListener('click', saveLocal);
   $('editor-add').addEventListener('click', () => $('editor-rows').appendChild(editorRowEl({})));
   $('editor-scaffold').addEventListener('click', scaffoldEditor);
+  $('editor-set-prev').addEventListener('click', () => setEditorSet(state.edit.set - 1));
+  $('editor-set-next').addEventListener('click', () => setEditorSet(state.edit.set + 1));
+  $('editor-set-add').addEventListener('click', addSet);
+  $('editor-set-del').addEventListener('click', removeSet);
   $('editor-save').addEventListener('click', () => {
     if (saveEditorData()) {
       saveLocal(); // saving also stores it in this browser

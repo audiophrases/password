@@ -35,7 +35,16 @@ export class Game extends EventTarget {
 
   get currentEntry() {
     const l = this.currentLetter;
-    return l ? this.byLetter.get(l) : null;
+    return l ? this.entryFor(this.activeIndex, l) : null;
+  }
+
+  // Each player gets their own variant for a letter, so players in the same
+  // room don't share words. Wraps if there are fewer variants than players.
+  entryFor(playerIndex, letter) {
+    const e = this.byLetter.get(letter);
+    if (!e) return null;
+    const v = e.variants[playerIndex % e.variants.length];
+    return { letter: e.letter, type: e.type, answer: v.answer, accept: v.accept, clue: v.clue };
   }
 
   score(player = this.active) {

@@ -10,14 +10,21 @@ export function buildPrompt({
   letters = ALPHABET_EN,
   langCode = 'en-US',
   durationSec = 200,
+  players = 1,
 }) {
   const letterList = letters.join(', ');
-  return `You are creating word lists for "Password", an alphabet word game for an ESL classroom. There is one target word and one clue for each letter of the alphabet, and the player guesses each word from its clue.
+  const n = Math.max(1, players);
+  const variantsRule =
+    n > 1
+      ? `Provide exactly ${n} "variants" per letter — a DIFFERENT word (with its own clue) for each player. The players are in the same classroom and hear each other answer, so no two players may get the same word for a given letter; make the variants genuinely different words, not synonyms or plurals of one another.`
+      : `Provide exactly 1 "variant" per letter.`;
+  return `You are creating word lists for "Password", an alphabet word game for an ESL classroom. There is one word and clue per letter of the alphabet; the player guesses each word from its clue.
 
 Target language: ${language}
 Level (CEFR): ${level}
 Topic / theme: ${topic}
 Letters to include: ${letterList}
+Players: ${n}
 
 Return ONLY valid JSON (no markdown, no commentary) matching this exact schema:
 
@@ -26,23 +33,31 @@ Return ONLY valid JSON (no markdown, no commentary) matching this exact schema:
   "language": "${language}",
   "langCode": "${langCode}",
   "settings": { "durationSec": ${durationSec}, "mode": "voice-assist", "strictness": 0.7 },
+  "players": ${n},
   "letters": [
     {
       "letter": "A",
       "type": "starts",            // "starts" (word begins with the letter) or "contains" (letter appears in it)
-      "answer": "string — the single target word, lowercase",
-      "accept": ["optional synonyms or accepted variants, lowercase"],
-      "clue": "string — a one-sentence definition/clue at ${level} level. Do NOT include the answer word."
+      "variants": [
+        {
+          "answer": "string — the target word, lowercase",
+          "accept": ["optional synonyms / accepted variants, lowercase"],
+          "clue": "string — a one-sentence clue at ${level} level. Do NOT include the answer word."
+        }
+        // exactly ${n} variant object(s), one per player
+      ]
     }
   ]
 }
 
 Rules:
 - Write every answer and clue in ${language} (the target language).
-- One object per letter listed above, in that order.
-- Prefer "starts" for the letter; only use "contains" when no good ${level} word starts with it (then make the clue end with "(contains <LETTER>)").
+- One letter object per letter listed above, in that order.
+- ${variantsRule}
+- All variants of a letter share the same "letter" and "type".
+- Prefer "starts" for the letter; only use "contains" when no good ${level} word fits (then end each clue with "(contains <LETTER>)").
 - Keep answers to a single word where possible, lowercase, no punctuation.
-- Clues must be solvable at ${level} and must never contain the answer.
+- Clues must be solvable at ${level} and must never contain their own answer.
 - Output JSON only.`;
 }
 
@@ -64,17 +79,23 @@ export function validateGame(obj) {
     if (!letter) errors.push(`${where} missing "letter".`);
     if (seen.has(letter)) errors.push(`${where} duplicate letter "${letter}".`);
     seen.add(letter);
-    if (!l.answer || typeof l.answer !== 'string') errors.push(`${where} missing "answer".`);
-    if (!l.clue || typeof l.clue !== 'string') errors.push(`${where} missing "clue".`);
     const type = l.type === 'contains' ? 'contains' : 'starts';
-    const accept = Array.isArray(l.accept) ? l.accept.filter((x) => typeof x === 'string') : [];
-    return {
-      letter,
-      type,
-      answer: String(l.answer || ''),
-      accept,
-      clue: String(l.clue || ''),
-    };
+
+    // Each letter has one or more per-player variants. Accept the legacy
+    // single-word shape ({answer, accept, clue}) as a single variant.
+    const rawVariants =
+      Array.isArray(l.variants) && l.variants.length ? l.variants : [{ answer: l.answer, accept: l.accept, clue: l.clue }];
+    const variants = rawVariants.map((v, j) => {
+      if (!v || typeof v !== 'object') {
+        errors.push(`${where} variant ${j + 1} is not an object.`);
+        return null;
+      }
+      if (!v.answer || typeof v.answer !== 'string') errors.push(`${letter || where} variant ${j + 1} missing "answer".`);
+      if (!v.clue || typeof v.clue !== 'string') errors.push(`${letter || where} variant ${j + 1} missing "clue".`);
+      const accept = Array.isArray(v.accept) ? v.accept.filter((x) => typeof x === 'string') : [];
+      return { answer: String(v.answer || ''), accept, clue: String(v.clue || '') };
+    });
+    return { letter, type, variants };
   });
 
   if (errors.length) return { ok: false, errors };

@@ -50,10 +50,13 @@ announced with the letter in the game's language — e.g. *"Begins with the lett
 ## How a round works
 
 1. **Generate the words.** On the setup screen pick language / level / topic / letters / number of
-   players and click **Build chatbot prompt**. Copy it into ChatGPT, Claude, or any chatbot.
+   players and click **Build chatbot prompt**. Copy it into ChatGPT, Claude, or any chatbot. With
+   more than one player, the prompt asks for a **different word per player for each letter**, so
+   students in the same room don't get the same words.
 2. **Your games** — section 2 is a library saved in this browser:
    - **✏️ New game** opens the editor (a table of letter · language · starts/contains · answer ·
-     accepted synonyms · clue); its **💾 Save** adds the round to the library.
+     accepted synonyms · clue); its **💾 Save** adds the round to the library. Use the **Word set**
+     switcher (+ player set / ‹ ›) to give each player a different word for the same letters.
    - Each saved game shows as a row — **click it to open** (ready to play), **✏️** to edit, **🗑**
      to delete. **💾 Save current game** stores whatever is currently loaded.
    - **Import** (the collapsible at the bottom) brings a game in from a chatbot (paste the JSON),
@@ -124,15 +127,28 @@ connections itself, so the relay is the rendezvous.
 
 ## Game JSON schema
 
+Each letter has one or more **variants** — one per player, so students in the same room don't
+get the same words (hearing another player's word would make it too easy). Player *i* plays
+`variants[i]` for each letter (wrapping if there are fewer variants than players). A legacy
+single-word shape `{ "answer", "accept", "clue" }` per letter is still accepted and treated as
+one shared variant.
+
 ```json
 {
   "title": "Everyday English A2",
   "language": "English",
   "langCode": "en-US",
   "settings": { "durationSec": 200, "mode": "voice-assist", "strictness": 0.7 },
+  "players": 2,
   "letters": [
-    { "letter": "A", "type": "starts", "answer": "apple", "accept": [], "clue": "A round fruit…" },
-    { "letter": "X", "type": "contains", "answer": "fox",  "accept": [], "clue": "…(contains X)" }
+    { "letter": "A", "type": "starts", "variants": [
+      { "answer": "apple", "accept": [], "clue": "A round fruit…" },
+      { "answer": "ant",   "accept": [], "clue": "A tiny insect…" }
+    ] },
+    { "letter": "X", "type": "contains", "variants": [
+      { "answer": "fox", "accept": [], "clue": "…(contains X)" },
+      { "answer": "box", "accept": [], "clue": "…(contains X)" }
+    ] }
   ]
 }
 ```
