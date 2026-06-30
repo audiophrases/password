@@ -114,9 +114,11 @@ export function bestVoice(langCode) {
   return voicesFor(langCode)[0] || null;
 }
 
+let keepAlive = null;
+
 export function speak(text, langCode = 'en-US', voiceName = null) {
   if (!window.speechSynthesis || !text) return;
-  window.speechSynthesis.cancel();
+  stopSpeaking();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = langCode;
   const two = langCode.slice(0, 2).toLowerCase();
@@ -129,9 +131,17 @@ export function speak(text, langCode = 'en-US', voiceName = null) {
   if (voice) u.voice = voice;
   u.rate = 0.95;
   u.pitch = 1;
+  u.onend = () => clearInterval(keepAlive);
+  u.onerror = () => clearInterval(keepAlive);
   window.speechSynthesis.speak(u);
+  // Work around the Chromium/Edge bug that stops long utterances after ~15s.
+  keepAlive = setInterval(() => {
+    if (window.speechSynthesis.speaking) window.speechSynthesis.resume();
+    else clearInterval(keepAlive);
+  }, 9000);
 }
 
 export function stopSpeaking() {
+  clearInterval(keepAlive);
   if (window.speechSynthesis) window.speechSynthesis.cancel();
 }

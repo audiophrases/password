@@ -20,6 +20,7 @@ const state = {
   cameraOn: false,
   autoRead: false,
   voiceName: null,
+  voicePicked: false,
   lastSuggestion: null,
   link: null,
   remoteUrl: '',
@@ -67,11 +68,12 @@ function populateVoices(langCode) {
     o.textContent = v.name.replace(/^Microsoft\s+/, '').replace(/\s*-\s*.*$/, ''); // shorten label
     sel.appendChild(o);
   }
-  if (list.some((v) => v.name === prev)) {
-    sel.value = prev;
+  if (state.voicePicked && list.some((v) => v.name === prev)) {
+    sel.value = prev; // keep an explicit user choice
     state.voiceName = prev;
   } else {
-    state.voiceName = list[0].name; // best = a "Natural" Edge voice when available
+    // auto-pick the best — a "Natural" Edge voice once the online voices load
+    state.voiceName = list[0].name;
     sel.value = state.voiceName;
   }
 }
@@ -97,9 +99,13 @@ function setupScreen() {
   $('language').addEventListener('change', () => {
     const opt = $('language').selectedOptions[0];
     $('letters').value = opt.dataset.letters;
+    state.voicePicked = false; // re-auto-pick the best voice for the new language
     populateVoices(opt.value);
   });
-  $('voice').addEventListener('change', () => (state.voiceName = $('voice').value || null));
+  $('voice').addEventListener('change', () => {
+    state.voiceName = $('voice').value || null;
+    state.voicePicked = true;
+  });
   $('test-voice').addEventListener('click', () => {
     const code = $('language').value;
     const samples = {
