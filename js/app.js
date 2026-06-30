@@ -84,7 +84,7 @@ function populateVoices(langCode) {
     return;
   }
 
-  const list = voicesFor(langCode);
+  const list = voicesFor(langCode).slice(0, 4); // just the best few, not Edge's whole list
   if (!list.length) {
     sel.innerHTML = '<option value="" data-type="browser">(system default)</option>';
     state.voiceName = null;
@@ -220,6 +220,7 @@ function setupScreen() {
     const text = await file.text();
     $('json-input').value = text;
     loadGameText(text, players);
+    if (!$('editor').classList.contains('hidden') && state.data) openEditor(); // refresh editor view
     e.target.value = '';
   });
 
@@ -393,6 +394,7 @@ function downloadGame() {
 function bindEditor() {
   $('edit-game').addEventListener('click', openEditor);
   $('save-file').addEventListener('click', downloadGame);
+  $('editor-open').addEventListener('click', () => $('file-input').click());
   $('editor-add').addEventListener('click', () => $('editor-rows').appendChild(editorRowEl({})));
   $('editor-scaffold').addEventListener('click', scaffoldEditor);
   $('editor-save').addEventListener('click', () => {

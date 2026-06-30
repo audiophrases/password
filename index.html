@@ -60,13 +60,13 @@
         <textarea id="json-input" class="mono" rows="8" placeholder='{ "title": "...", "letters": [ ... ] }'></textarea>
         <div class="field-row">
           <button id="load-json" class="btn">Load JSON</button>
-          <button id="load-file" class="btn ghost">Load file</button>
           <button id="load-sample" class="btn ghost">Try sample round</button>
         </div>
         <input id="file-input" type="file" accept=".txt,.json,text/plain,application/json" hidden />
         <div id="validation" class="msg"></div>
         <div class="field-row">
           <button id="edit-game" class="btn ghost">✏️ Create / edit manually</button>
+          <button id="load-file" class="btn ghost">📂 Open file</button>
           <button id="save-file" class="btn ghost">💾 Save to file</button>
         </div>
       </div>
@@ -110,6 +110,7 @@
       <div class="editor-actions">
         <button id="editor-scaffold" class="btn ghost small">+ Letters A–Z</button>
         <button id="editor-add" class="btn ghost small">+ Row</button>
+        <button id="editor-open" class="btn ghost">📂 Open file</button>
         <button id="editor-download" class="btn ghost">💾 Save to file</button>
         <button id="editor-save" class="btn primary">Save &amp; load</button>
         <button id="editor-cancel" class="btn ghost">Cancel</button>
