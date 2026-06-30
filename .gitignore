@@ -1,0 +1,5 @@
+# Local tooling / editor artifacts — not part of the game
+.codegraph/
+.vscode/
+.DS_Store
+node_modules/
