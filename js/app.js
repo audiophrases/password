@@ -590,6 +590,8 @@ function pushRemoteState() {
     letter: e ? e.letter : '',
     kind: e ? (e.type === 'contains' ? `Contains ${e.letter}` : `Starts with ${e.letter}`) : '',
     clue: e ? e.clue : '',
+    answer: e ? e.answer : '',
+    accept: e ? (e.accept || []).join(', ') : '',
     paused: g.paused,
     suggestion: state.lastSuggestion || '',
   });
@@ -630,6 +632,7 @@ function startGame(players) {
   game.addEventListener('tick', renderHud);
   game.addEventListener('end', showResults);
 
+  applyClueHidden(true); // audio-only by default; teacher can reveal with 👁 / H
   game.start();
   render();
 }
@@ -698,14 +701,19 @@ function readCurrentClue() {
 }
 
 // Hide/show the written definition so the round can be played from audio only.
-function toggleClue() {
-  const hidden = document.body.classList.toggle('clue-hidden');
+function applyClueHidden(hidden) {
+  document.body.classList.toggle('clue-hidden', hidden);
   const btn = $('toggle-clue');
   if (btn) {
     btn.textContent = hidden ? '🙈' : '👁';
     btn.title = hidden ? 'Show definition' : 'Hide definition (audio only)';
   }
-  // switching to audio-only mid-letter: speak the current clue right away
+}
+
+function toggleClue() {
+  const hidden = !document.body.classList.contains('clue-hidden');
+  applyClueHidden(hidden);
+  // revealing to audio-only mid-letter: speak the current clue right away
   if (hidden && state.game && !$('game').classList.contains('hidden')) readCurrentClue();
 }
 

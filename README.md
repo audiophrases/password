@@ -41,8 +41,9 @@ only in local-server mode (not GitHub Pages). If it's ever unreachable, the app 
 browser voice automatically. (Requires a correct system clock — the token Microsoft uses is
 time-based.)
 
-**Audio-only mode:** the 👁 button (or `H`, or 👁 Text on the phone) hides the written
-definition so students rely on listening. When hidden, each clue is read aloud automatically,
+**Audio-only mode:** definitions are **hidden by default** when a round starts, so students rely
+on listening; reveal/hide them with the 👁 button (or `H`, or 👁 Text on the phone). When hidden,
+each clue is read aloud automatically,
 announced with the letter in the game's language — e.g. *"Begins with the letter R…"*,
 *"Empieza por la letra R…"*, *"Comença per la lletra R…"*. The 🔊 button reads it on demand.
 
@@ -108,8 +109,9 @@ Run `node server.js`, then on your phone open the `http://<LAN-IP>:8000/remote` 
 Wi-Fi, or join the laptop to your phone's hotspot.
 
 You get big **Correct / Pass / Wrong** buttons, **hold-to-talk**, and Start / Pause / Clue /
-Camera / Fullscreen / Exit — plus the current player, letter, clue, score and timer mirrored
-on the phone (so you can read the clue without looking at the projector). Presses travel phone
+Camera / Fullscreen / Exit — plus the current player, letter, clue, **the expected answer**,
+score and timer mirrored on the phone. So you can read the clue, see the answer, and judge
+Correct/Wrong from your phone without looking at the projector. Presses travel phone
 → laptop over the local network in a few milliseconds; **no internet needed.** After that one
 URL the laptop is untouched: students watch the projected circle while you drive from the phone.
 

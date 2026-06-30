@@ -54,6 +54,8 @@ function applyState(m) {
     $('r-letter').textContent = '';
     $('r-kind').textContent = '';
     $('r-clue').textContent = m.loaded ? `Loaded: ${m.title} — press ▶ Start` : 'Load a game on the laptop first.';
+    $('r-answer').textContent = '';
+    $('r-accept').textContent = '';
     $('r-sugg').textContent = '';
     return;
   }
@@ -64,6 +66,8 @@ function applyState(m) {
   $('r-letter').textContent = m.letter || '';
   $('r-kind').textContent = m.kind || '';
   $('r-clue').textContent = m.clue || '';
+  $('r-answer').textContent = m.answer || '';
+  $('r-accept').textContent = m.accept ? ` · also: ${m.accept}` : '';
   $('r-sugg').textContent = m.paused
     ? '⏸ paused'
     : m.suggestion
