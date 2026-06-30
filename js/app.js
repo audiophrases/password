@@ -10,6 +10,16 @@ import { connect } from './link.js';
 const $ = (id) => document.getElementById(id);
 const PLAYER_COLORS = ['#e8632c', '#1f9d55', '#2b6cb0', '#9b2c98', '#b7791f', '#0d9488'];
 
+// Microsoft neural voices served via the local server's /tts endpoint.
+const NEURAL_VOICES = {
+  'en-US': ['en-US-AvaNeural', 'en-US-AndrewNeural', 'en-US-EmmaNeural', 'en-US-BrianNeural'],
+  'es-ES': ['es-ES-ElviraNeural', 'es-ES-AlvaroNeural', 'es-ES-XimenaNeural'],
+  'fr-FR': ['fr-FR-DeniseNeural', 'fr-FR-HenriNeural', 'fr-FR-VivienneNeural'],
+  'ca-ES': ['ca-ES-JoanaNeural', 'ca-ES-EnricNeural'],
+};
+const neuralLabel = (id) => (id.split('-')[2] || id).replace(/Neural$/, '');
+const ttsAudio = typeof Audio !== 'undefined' ? new Audio() : null;
+
 const state = {
   game: null,
   data: null,
@@ -21,6 +31,9 @@ const state = {
   autoRead: false,
   voiceName: null,
   voicePicked: false,
+  neuralAvailable: false,
+  useNeural: false,
+  neuralBroken: false,
   lastSuggestion: null,
   link: null,
   remoteUrl: '',
@@ -51,20 +64,36 @@ function renderPlayers(players) {
   );
 }
 
-// Voice picker, populated from the browser's voices for the chosen language.
+// Voice picker — neural voices (via the server) when available, else browser voices.
 function populateVoices(langCode) {
   const sel = $('voice');
   const prev = sel.value;
-  const list = voicesFor(langCode);
   sel.innerHTML = '';
+
+  if (state.useNeural && state.neuralAvailable && !state.neuralBroken) {
+    const list = NEURAL_VOICES[langCode] || NEURAL_VOICES['en-US'];
+    for (const id of list) {
+      const o = document.createElement('option');
+      o.value = id;
+      o.dataset.type = 'neural';
+      o.textContent = `${neuralLabel(id)} — neural`;
+      sel.appendChild(o);
+    }
+    if (state.voicePicked && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+    state.voiceName = null; // browser voice unused in neural mode
+    return;
+  }
+
+  const list = voicesFor(langCode);
   if (!list.length) {
-    sel.innerHTML = '<option value="">(system default)</option>';
+    sel.innerHTML = '<option value="" data-type="browser">(system default)</option>';
     state.voiceName = null;
     return;
   }
   for (const v of list) {
     const o = document.createElement('option');
     o.value = v.name;
+    o.dataset.type = 'browser';
     o.textContent = v.name.replace(/^Microsoft\s+/, '').replace(/\s*-\s*.*$/, ''); // shorten label
     sel.appendChild(o);
   }
@@ -75,6 +104,44 @@ function populateVoices(langCode) {
     // auto-pick the best — a "Natural" Edge voice once the online voices load
     state.voiceName = list[0].name;
     sel.value = state.voiceName;
+  }
+}
+
+// Read text aloud: neural (server /tts) when a neural voice is selected, else browser.
+function narrate(text, langCode) {
+  if (!text) return;
+  const sel = $('voice').selectedOptions[0];
+  if (sel && sel.dataset.type === 'neural' && !state.neuralBroken && ttsAudio) {
+    stopSpeaking();
+    ttsAudio.onerror = () => {
+      // server TTS failed (offline / token rejected): drop to the browser voice for good
+      ttsAudio.onerror = null;
+      state.neuralBroken = true;
+      state.useNeural = false;
+      const nb = $('neural');
+      if (nb) nb.checked = false;
+      if ($('neural-note')) $('neural-note').textContent = 'Neural voice unavailable — using the browser voice.';
+      populateVoices(langCode);
+      speak(text, langCode, state.voiceName);
+    };
+    ttsAudio.src = `/tts?voice=${encodeURIComponent(sel.value)}&text=${encodeURIComponent(text)}`;
+    ttsAudio.play().catch(() => {});
+    return;
+  }
+  speak(text, langCode, state.voiceName);
+}
+
+function stopNarration() {
+  stopSpeaking();
+  if (ttsAudio) {
+    ttsAudio.onerror = null;
+    try {
+      ttsAudio.pause();
+      ttsAudio.removeAttribute('src');
+      ttsAudio.load();
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -114,7 +181,12 @@ function setupScreen() {
       'es-ES': 'Esta es la voz que leerá las pistas en voz alta.',
       'ca-ES': 'Aquesta és la veu que llegirà les pistes en veu alta.',
     };
-    speak(samples[code] || samples['en-US'], code, state.voiceName);
+    narrate(samples[code] || samples['en-US'], code);
+  });
+  $('neural').addEventListener('change', () => {
+    state.useNeural = $('neural').checked;
+    state.voicePicked = false;
+    populateVoices($('language').value);
   });
   populateVoices($('language').value);
   onVoices(() => populateVoices($('language').value)); // re-list once Edge's natural voices load
@@ -355,6 +427,16 @@ async function initRemoteLink() {
     return;
   }
   state.remoteUrl = `http://${info.ip}:${info.port}/remote`;
+  // server present -> Microsoft neural voices available via /tts
+  state.neuralAvailable = true;
+  const nb = $('neural');
+  if (nb && !state.neuralBroken) {
+    nb.disabled = false;
+    nb.checked = true;
+    state.useNeural = true;
+    if ($('neural-note')) $('neural-note').textContent = 'Using Microsoft neural voices via the server.';
+    populateVoices($('language').value);
+  }
   state.link = connect({
     role: 'host',
     onCmd: handleRemoteCommand,
@@ -528,7 +610,7 @@ function spokenClue(entry, langCode) {
 }
 function readCurrentClue() {
   const e = state.game?.currentEntry;
-  if (e) speak(spokenClue(e, state.game.data.langCode), state.game.data.langCode, state.voiceName);
+  if (e) narrate(spokenClue(e, state.game.data.langCode), state.game.data.langCode);
 }
 
 // Hide/show the written definition so the round can be played from audio only.
@@ -661,7 +743,7 @@ async function toggleCamera() {
 }
 
 function showResults() {
-  stopSpeaking();
+  stopNarration();
   const overlay = $('result');
   const rows = state.game
     .results()
@@ -673,7 +755,7 @@ function showResults() {
 }
 
 function endToSetup() {
-  stopSpeaking();
+  stopNarration();
   stopTalk();
   state.camera.stop($('cam'));
   state.cameraOn = false;

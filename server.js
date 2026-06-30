@@ -11,10 +11,184 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const tls = require('tls');
 
 const ROOT = __dirname;
 const PORT = process.env.PORT || 8000;
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+
+// ---------------- Microsoft edge-tts (real neural voices) ----------------
+// Reverse-engineered Edge "Read Aloud" endpoint — no key, no dependency. Gives
+// the same neural voices as Edge (e.g. ca-ES-JoanaNeural), played in any browser.
+const TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+const TTS_HOST = 'speech.platform.bing.com';
+const TTS_PATH = '/consumer/speech/synthesize/readaloud/edge/v1';
+const EDGE_VERSION = '130.0.2849.68';
+
+// Security token Microsoft now requires: SHA-256 of (Windows-filetime ticks
+// rounded down to 5 min) + the trusted client token.
+function secMsGec() {
+  let ticks = Math.floor(Date.now() / 1000) + 11644473600; // unix -> seconds since 1601
+  ticks -= ticks % 300; // round down to 5 minutes
+  ticks *= 10000000; // seconds -> 100-nanosecond units
+  return crypto.createHash('sha256').update(`${BigInt(ticks)}${TRUSTED_TOKEN}`).digest('hex').toUpperCase();
+}
+
+function buildSsml(text, voice) {
+  const safe = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lang = voice.slice(0, 5); // e.g. "ca-ES"
+  return (
+    `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>` +
+    `<voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${safe}</prosody></voice></speak>`
+  );
+}
+
+// Masked client WebSocket frame (client->server frames must be masked).
+function maskedFrame(payload, opcode = 0x1) {
+  const body = Buffer.isBuffer(payload) ? payload : Buffer.from(payload, 'utf8');
+  const len = body.length;
+  let header;
+  if (len < 126) header = Buffer.from([0x80 | opcode, 0x80 | len]);
+  else if (len < 65536) {
+    header = Buffer.alloc(4);
+    header[0] = 0x80 | opcode;
+    header[1] = 0x80 | 126;
+    header.writeUInt16BE(len, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = 0x80 | opcode;
+    header[1] = 0x80 | 127;
+    header.writeBigUInt64BE(BigInt(len), 2);
+  }
+  const mask = crypto.randomBytes(4);
+  const masked = Buffer.allocUnsafe(len);
+  for (let i = 0; i < len; i++) masked[i] = body[i] ^ mask[i & 3];
+  return Buffer.concat([header, mask, masked]);
+}
+
+function synthesize(text, voice) {
+  return new Promise((resolve, reject) => {
+    const connId = crypto.randomUUID().replace(/-/g, '');
+    const query =
+      `?TrustedClientToken=${TRUSTED_TOKEN}` +
+      `&Sec-MS-GEC=${secMsGec()}&Sec-MS-GEC-Version=1-${EDGE_VERSION}&ConnectionId=${connId}`;
+    const key = crypto.randomBytes(16).toString('base64');
+    const socket = tls.connect({ host: TTS_HOST, port: 443, servername: TTS_HOST }, () => {
+      socket.write(
+        [
+          `GET ${TTS_PATH + query} HTTP/1.1`,
+          `Host: ${TTS_HOST}`,
+          'Upgrade: websocket',
+          'Connection: Upgrade',
+          `Sec-WebSocket-Key: ${key}`,
+          'Sec-WebSocket-Version: 13',
+          'Origin: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+          'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+          'Pragma: no-cache',
+          'Cache-Control: no-cache',
+          '',
+          '',
+        ].join('\r\n')
+      );
+    });
+
+    let handshake = false;
+    let buf = Buffer.alloc(0);
+    let fragOp = 0;
+    let frag = Buffer.alloc(0);
+    const chunks = [];
+    let done = false;
+    const timer = setTimeout(() => finish(new Error('tts timeout')), 15000);
+
+    function finish(err) {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try {
+        socket.destroy();
+      } catch {
+        /* ignore */
+      }
+      if (err) reject(err);
+      else resolve(Buffer.concat(chunks));
+    }
+
+    function onMessage(opcode, payload) {
+      if (opcode === 0x2) {
+        const headerLen = payload.readUInt16BE(0);
+        const audio = payload.slice(2 + headerLen);
+        if (audio.length) chunks.push(audio);
+      } else if (opcode === 0x1) {
+        if (payload.toString('utf8').includes('Path:turn.end')) finish();
+      } else if (opcode === 0x8) {
+        finish();
+      } else if (opcode === 0x9) {
+        socket.write(maskedFrame(payload, 0xa)); // pong
+      }
+    }
+
+    socket.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      if (!handshake) {
+        const idx = buf.indexOf('\r\n\r\n');
+        if (idx === -1) return;
+        const head = buf.slice(0, idx).toString();
+        if (!/ 101 /.test(head)) return finish(new Error('handshake: ' + head.split('\r\n')[0]));
+        handshake = true;
+        buf = buf.slice(idx + 4);
+        const ts = new Date().toString();
+        socket.write(
+          maskedFrame(
+            `X-Timestamp:${ts}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n` +
+              `{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}`
+          )
+        );
+        socket.write(
+          maskedFrame(
+            `X-RequestId:${connId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${ts}\r\nPath:ssml\r\n\r\n` +
+              buildSsml(text, voice)
+          )
+        );
+      }
+      for (;;) {
+        if (buf.length < 2) break;
+        const fin = (buf[0] & 0x80) !== 0;
+        const opcode = buf[0] & 0x0f;
+        const masked = (buf[1] & 0x80) !== 0;
+        let len = buf[1] & 0x7f;
+        let off = 2;
+        if (len === 126) {
+          if (buf.length < 4) break;
+          len = buf.readUInt16BE(2);
+          off = 4;
+        } else if (len === 127) {
+          if (buf.length < 10) break;
+          len = Number(buf.readBigUInt64BE(2));
+          off = 10;
+        }
+        if (masked) off += 4;
+        if (buf.length < off + len) break;
+        const payload = buf.slice(off, off + len);
+        buf = buf.slice(off + len);
+        if (opcode === 0x0) {
+          frag = Buffer.concat([frag, payload]);
+          if (fin) {
+            onMessage(fragOp, frag);
+            frag = Buffer.alloc(0);
+            fragOp = 0;
+          }
+        } else if (!fin) {
+          fragOp = opcode;
+          frag = payload;
+        } else {
+          onMessage(opcode, payload);
+        }
+      }
+    });
+    socket.on('error', (e) => finish(e));
+    socket.on('close', () => finish(chunks.length ? undefined : new Error('closed early')));
+  });
+}
 
 const MIME = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
@@ -49,6 +223,26 @@ const server = http.createServer((req, res) => {
   if (p === '/lan-info') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ip: lanIP(), port: Number(PORT) }));
+    return;
+  }
+  if (p === '/tts') {
+    const voice = u.searchParams.get('voice') || 'en-US-AvaNeural';
+    const text = u.searchParams.get('text') || '';
+    if (!text) {
+      res.writeHead(400);
+      res.end('no text');
+      return;
+    }
+    synthesize(text, voice)
+      .then((audio) => {
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
+        res.end(audio);
+      })
+      .catch((e) => {
+        console.warn('TTS error:', e.message);
+        res.writeHead(502);
+        res.end('tts failed');
+      });
     return;
   }
   const file = path.normalize(path.join(ROOT, p));
@@ -251,8 +445,12 @@ setInterval(() => {
   }
 }, 25000);
 
-server.listen(PORT, () => {
-  console.log(`Password running:`);
-  console.log(`  Game (this laptop):  http://localhost:${PORT}`);
-  console.log(`  Phone remote:        http://${lanIP()}:${PORT}/remote   (same Wi-Fi / hotspot)`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Password running:`);
+    console.log(`  Game (this laptop):  http://localhost:${PORT}`);
+    console.log(`  Phone remote:        http://${lanIP()}:${PORT}/remote   (same Wi-Fi / hotspot)`);
+  });
+}
+
+module.exports = { synthesize, secMsGec };

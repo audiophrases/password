@@ -32,6 +32,15 @@ Microsoft's "… Online (Natural)" voices (the same engine as Edge Read Aloud) �
 the best natural voice per language, and you can override it (and press ▶ to test) in section 1.
 In other browsers it falls back to whatever voices are installed.
 
+**Best quality — neural voices via the server.** When you run `node server.js`, tick
+**High-quality neural voice** in section 1. The server reaches Microsoft's edge-tts endpoint and
+streams real neural voices (e.g. `ca-ES-JoanaNeural`, `fr-FR-DeniseNeural`) as audio that plays in
+*any* browser — the same quality as Edge Read Aloud, independent of the browser's installed voices,
+and notably better for Catalan. It's dependency-free (no `npm install`), needs internet, and works
+only in local-server mode (not GitHub Pages). If it's ever unreachable, the app falls back to the
+browser voice automatically. (Requires a correct system clock — the token Microsoft uses is
+time-based.)
+
 **Audio-only mode:** the 👁 button (or `H`, or 👁 Text on the phone) hides the written
 definition so students rely on listening. When hidden, each clue is read aloud automatically,
 announced with the letter in the game's language — e.g. *"Begins with the letter R…"*,
@@ -139,7 +148,7 @@ connections itself, so the relay is the rendezvous.
 | `js/speech.js` | Web Speech recognition (alternatives) + synthesis |
 | `js/camera.js` | webcam for the center-of-circle projector look |
 | `js/ai.js` | prompt builder + JSON validation |
-| `server.js` | static server + WebSocket relay for the phone remote (no deps) |
+| `server.js` | static server + phone-remote WebSocket relay + neural-TTS proxy (no deps) |
 | `remote.html` / `remote.css` / `js/remote.js` | the phone controller page |
 | `js/link.js` | WebSocket client shared by the game and the remote |
 | `sample-game.json` | a ready-to-play A2 round |
