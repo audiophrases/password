@@ -770,6 +770,10 @@ function startGame(players) {
   applyClueHidden(true); // audio-only by default; teacher can reveal with 👁 / H
   game.start();
   render();
+
+  // Flash the controls so the teacher sees them, then auto-hide out of the picture.
+  state.autohide?.show();
+  state.autohide?.scheduleHide(3000);
 }
 
 const CORNERS = ['tl', 'tr', 'bl', 'br', 'ml', 'mr'];
@@ -967,6 +971,54 @@ function bindGameControls() {
   document.addEventListener('keyup', (e) => {
     if (e.key.toLowerCase() === 'v') stopTalk();
   });
+
+  state.autohide = setupControlsAutohide();
+}
+
+// Keep the control bar out of the projected picture until the teacher drops the
+// mouse to the bottom of the screen. It also stays up while a control is in use.
+function setupControlsAutohide() {
+  const game = $('game');
+  const REVEAL_ZONE = 120; // px from the bottom edge that summons the bar
+  let hideTimer = null;
+
+  const forceVisible = () =>
+    document.activeElement === $('type-answer') ||
+    $('mic').classList.contains('live') ||
+    (state.game && state.game.paused);
+
+  const show = () => {
+    clearTimeout(hideTimer);
+    game.classList.remove('controls-hidden');
+  };
+  const hide = () => {
+    if (!forceVisible()) game.classList.add('controls-hidden');
+  };
+  const scheduleHide = (delay = 1500) => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hide, delay);
+  };
+
+  document.addEventListener('pointermove', (e) => {
+    if (game.classList.contains('hidden')) return;
+    if (e.clientY >= window.innerHeight - REVEAL_ZONE) show();
+    else scheduleHide();
+  });
+  document.addEventListener('touchstart', (e) => {
+    if (game.classList.contains('hidden')) return;
+    const t = e.touches[0];
+    if (t && t.clientY >= window.innerHeight - REVEAL_ZONE) {
+      show();
+      scheduleHide(3000);
+    }
+  }, { passive: true });
+
+  $('controls').addEventListener('pointerenter', show);
+  $('controls').addEventListener('pointerleave', () => scheduleHide());
+  $('type-answer').addEventListener('focus', show);
+  $('type-answer').addEventListener('blur', () => scheduleHide());
+
+  return { show, scheduleHide };
 }
 
 async function toggleCamera() {

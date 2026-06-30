@@ -237,6 +237,12 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
 #controls {
   position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 8px; align-items: center; z-index: 6;
+  transition: opacity .25s ease, transform .25s ease;
+}
+/* Auto-hidden during play: slide the bar off the bottom edge until the mouse
+   comes down to it (toggled from app.js). */
+#game.controls-hidden #controls {
+  opacity: 0; transform: translate(-50%, 80px); pointer-events: none;
 }
 .ctrl { border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 10px; padding: 10px 12px; font-size: 16px; font-weight: 700; box-shadow: var(--shadow); }
 .ctrl.ok { background: var(--ok); border-color: var(--ok); color: #fff; }
