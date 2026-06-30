@@ -23,6 +23,9 @@ export class Game extends EventTarget {
     this.running = false;
     this.paused = false;
     this._timer = null;
+    this.revealMs = 1600; // hold the correct/wrong result before switching players
+    this._revealing = false;
+    this._revealTimer = null;
   }
 
   get active() {
@@ -66,7 +69,7 @@ export class Game extends EventTarget {
   _tick() {
     clearInterval(this._timer);
     this._timer = setInterval(() => {
-      if (!this.running || this.paused) return;
+      if (!this.running || this.paused || this._revealing) return;
       const p = this.active;
       p.timeLeft = Math.max(0, p.timeLeft - 1);
       if (p.timeLeft === 0) {
@@ -108,15 +111,29 @@ export class Game extends EventTarget {
   _resolve(state) {
     const p = this.active;
     const letter = this.currentLetter;
-    if (!letter || p.done) return;
+    if (!letter || p.done || this._revealing) return;
     p.results[letter] = state;
     p.queue.shift();
-    if (p.queue.length === 0) {
-      this._finishPlayer(p); // marks done, then rotates or ends
-    } else {
-      this._rotate();
+    const finishing = p.queue.length === 0;
+    const advance = () => {
+      if (finishing) this._finishPlayer(p); // marks done, then rotates or ends
+      else this._rotate();
+      if (!this.ended) this.emit('update');
+    };
+
+    // If another player will get the turn, hold the green/red reveal a beat first.
+    const willSwitch = this.players.some((x, i) => i !== this.activeIndex && !x.done);
+    if (!willSwitch) {
+      advance();
+      return;
     }
-    if (!this.ended) this.emit('update');
+    this._revealing = true;
+    this.emit('reveal');
+    clearTimeout(this._revealTimer);
+    this._revealTimer = setTimeout(() => {
+      this._revealing = false;
+      advance();
+    }, this.revealMs);
   }
 
   correct() {
@@ -131,7 +148,7 @@ export class Game extends EventTarget {
   pass() {
     const p = this.active;
     const letter = this.currentLetter;
-    if (!letter || p.done) return;
+    if (!letter || p.done || this._revealing) return;
     if (p.results[letter] === 'pending') p.results[letter] = 'passed';
     p.queue.push(p.queue.shift());
     this._rotate();

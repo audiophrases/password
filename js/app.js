@@ -15,7 +15,7 @@ const NEURAL_VOICES = {
   'en-US': ['en-US-AvaNeural', 'en-US-AndrewNeural', 'en-US-EmmaNeural', 'en-US-BrianNeural'],
   'es-ES': ['es-ES-ElviraNeural', 'es-ES-AlvaroNeural', 'es-ES-XimenaNeural'],
   'fr-FR': ['fr-FR-DeniseNeural', 'fr-FR-HenriNeural', 'fr-FR-VivienneNeural'],
-  'ca-ES': ['ca-ES-JoanaNeural', 'ca-ES-EnricNeural'],
+  'ca-ES': ['ca-ES-EnricNeural', 'ca-ES-JoanaNeural'],
 };
 const neuralLabel = (id) => (id.split('-')[2] || id).replace(/Neural$/, '');
 const ttsAudio = typeof Audio !== 'undefined' ? new Audio() : null;
@@ -159,40 +159,6 @@ function narrate(text, langCode) {
     return;
   }
   speak(text, langCode, state.voiceName);
-}
-
-// Read a clue aloud. On the neural path the announcement ("<lead>. <LETTER>") and
-// the clue are played as TWO separate audio clips, so the very short single
-// letter is isolated by the clip-boundary silence and doesn't slur into the
-// lead-in or the clue (the edge endpoint ignores SSML <break>/<say-as>).
-function narrateClue(entry, langCode) {
-  if (!entry) return;
-  const set = SAY_PREFIX[(langCode || 'en').slice(0, 2).toLowerCase()] || SAY_PREFIX.en;
-  const lead = `${set[entry.type === 'contains' ? 'contains' : 'starts']}${set.sep}${entry.letter}`;
-  const clue = entry.clue || '';
-  const useNeural = state.useNeural && state.neuralAvailable && !state.neuralBroken && ttsAudio;
-  if (useNeural) {
-    const sel = $('voice').selectedOptions[0];
-    const selId = sel && sel.dataset.type === 'neural' ? sel.value : null;
-    const voiceId = neuralVoiceFor(langCode, selId);
-    stopNarration();
-    ttsAudio.onerror = () => {
-      ttsAudio.onerror = null;
-      ttsAudio.onended = null;
-      neuralFailed();
-      speak(`${lead}. ${clue}`, langCode, state.voiceName);
-    };
-    ttsAudio.onended = () => {
-      ttsAudio.onended = null; // after the letter, play the clue as its own clip
-      if (!clue) return;
-      ttsAudio.src = ttsUrl(voiceId, clue);
-      ttsAudio.play().catch(() => {});
-    };
-    ttsAudio.src = ttsUrl(voiceId, lead);
-    ttsAudio.play().catch(() => {});
-    return;
-  }
-  speak(`${lead}. ${clue}`, langCode, state.voiceName);
 }
 
 function stopNarration() {
@@ -797,6 +763,7 @@ function startGame(players) {
   }
 
   game.addEventListener('update', render);
+  game.addEventListener('reveal', renderReveal);
   game.addEventListener('tick', renderHud);
   game.addEventListener('end', showResults);
 
@@ -822,7 +789,7 @@ function layout() {
   });
 }
 
-function render() {
+function renderBoard() {
   const game = state.game;
   state.circles.forEach((r, i) => {
     const p = game.players[i];
@@ -832,11 +799,22 @@ function render() {
   });
   layout();
   renderHud();
-  renderClue();
   state.lastSuggestion = null;
   $('suggestion').className = 'suggestion';
   $('suggestion').textContent = '';
   $('heard').textContent = '';
+}
+
+function render() {
+  renderBoard();
+  renderClue();
+}
+
+// Multiplayer: show the green/red result on the board for a beat (no narration,
+// no turn change yet) before the engine switches to the next player.
+function renderReveal() {
+  stopNarration();
+  renderBoard();
 }
 
 function renderHud() {
@@ -853,19 +831,23 @@ function renderHud() {
   pushRemoteState();
 }
 
-// Spoken lead-in per language, e.g. "Begins with the letter R". `sep` goes between
-// the lead and the letter: a space for English (smooth), but a sentence break for
-// romance languages where "letra/lletra/lettre" ends in a vowel and would slur
-// into the letter (e.g. "la lletra A" -> "lletraa").
+// Spoken lead-in per language. The letter is wrapped in quotes and followed by a
+// colon — e.g. 'Comença per la lletra "A": <clue>' — which makes the neural voice
+// pronounce the single letter clearly without slurring into the lead or the clue.
 const SAY_PREFIX = {
-  en: { starts: 'Begins with the letter', contains: 'Contains the letter', sep: ' ' },
-  es: { starts: 'Empieza por la letra', contains: 'Contiene la letra', sep: '. ' },
-  fr: { starts: 'Commence par la lettre', contains: 'Contient la lettre', sep: '. ' },
-  ca: { starts: 'Comença per la lletra', contains: 'Conté la lletra', sep: '. ' },
+  en: { starts: 'Begins with the letter', contains: 'Contains the letter' },
+  es: { starts: 'Empieza por la letra', contains: 'Contiene la letra' },
+  fr: { starts: 'Commence par la lettre', contains: 'Contient la lettre' },
+  ca: { starts: 'Comença per la lletra', contains: 'Conté la lletra' },
 };
+function spokenClue(entry, langCode) {
+  const set = SAY_PREFIX[(langCode || 'en').slice(0, 2).toLowerCase()] || SAY_PREFIX.en;
+  const lead = set[entry.type === 'contains' ? 'contains' : 'starts'];
+  return `${lead} "${entry.letter}": ${entry.clue}`;
+}
 function readCurrentClue() {
   const e = state.game?.currentEntry;
-  if (e) narrateClue(e, state.game.data.langCode);
+  if (e) narrate(spokenClue(e, state.game.data.langCode), state.game.data.langCode);
 }
 
 // Hide/show the written definition so the round can be played from audio only.
