@@ -55,9 +55,12 @@ announced with the letter in the game's language — e.g. *"Begins with the lett
    surrounding prose). Or click **Try sample round**.
 
    No chatbot needed: click **✏️ Create / edit manually** to build or tweak a round in a
-   table (letter · starts/contains · answer · accepted synonyms · clue). It pre-fills from a
-   loaded game or scaffolds a blank A–Z for the chosen language. **💾 Save to file** downloads
-   the current game as a `.json` you can reopen anytime with **Load file**.
+   table (letter · language · starts/contains · answer · accepted synonyms · clue). It pre-fills
+   from a loaded game or scaffolds a blank A–Z for the chosen language.
+
+   **Saving:** **💾 Save in browser** stores the round in this browser; reopen saved rounds from
+   the **Saved games** list and remove them with **Delete** (they persist across sessions in that
+   browser, no files). **Load file** still imports an external `.json`/`.txt` if someone shares one.
 3. **Add players, pick a judging mode, press Start.**
 
 ### In-game keys (the teacher is always the final judge)

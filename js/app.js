@@ -372,41 +372,95 @@ function saveEditorData() {
   return true;
 }
 
-// Save the current game to a local .json file.
-function downloadGame() {
+// ---------- Saved games (browser storage) ----------
+
+const STORE_KEY = 'password.games.v1';
+
+function loadStore() {
+  try {
+    return JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+function persistStore(obj) {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(obj));
+  } catch (e) {
+    console.warn('Could not save to browser storage:', e);
+  }
+}
+
+function refreshSavedGames(selectName) {
+  const sel = $('saved-games');
+  if (!sel) return;
+  const names = Object.keys(loadStore()).sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = '';
+  if (!names.length) {
+    sel.innerHTML = '<option value="">— no saved games —</option>';
+  } else {
+    for (const n of names) {
+      const o = document.createElement('option');
+      o.value = n;
+      o.textContent = n;
+      sel.appendChild(o);
+    }
+  }
+  if (selectName && names.includes(selectName)) sel.value = selectName;
+  $('open-local').disabled = !names.length;
+  $('delete-local').disabled = !names.length;
+}
+
+// Save the current game into this browser (keyed by title; same title updates).
+function saveLocal() {
+  const v = $('validation');
   if (!state.data) {
-    const v = $('validation');
     v.className = 'msg error';
     v.textContent = 'Load or create a game first.';
     return;
   }
-  const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download =
-    (state.data.title || 'password-game').replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '') + '.json';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const store = loadStore();
+  store[state.data.title] = state.data;
+  persistStore(store);
+  refreshSavedGames(state.data.title);
+  v.className = 'msg ok';
+  v.textContent = `Saved "${state.data.title}" in this browser.`;
+}
+
+function openLocal() {
+  const name = $('saved-games').value;
+  if (!name) return;
+  const game = loadStore()[name];
+  if (!game) return;
+  loadGameText(JSON.stringify(game), state.players);
+  if (!$('editor').classList.contains('hidden')) openEditor(); // refresh editor view if open
+}
+
+function deleteLocal() {
+  const name = $('saved-games').value;
+  if (!name) return;
+  const store = loadStore();
+  delete store[name];
+  persistStore(store);
+  refreshSavedGames();
 }
 
 function bindEditor() {
   $('edit-game').addEventListener('click', openEditor);
-  $('save-file').addEventListener('click', downloadGame);
-  $('editor-open').addEventListener('click', () => $('file-input').click());
+  $('save-local').addEventListener('click', saveLocal);
+  $('open-local').addEventListener('click', openLocal);
+  $('delete-local').addEventListener('click', deleteLocal);
   $('editor-add').addEventListener('click', () => $('editor-rows').appendChild(editorRowEl({})));
   $('editor-scaffold').addEventListener('click', scaffoldEditor);
   $('editor-save').addEventListener('click', () => {
     if (saveEditorData()) {
+      saveLocal(); // saving also stores it in this browser
       closeEditor();
       pushRemoteState();
     }
   });
-  $('editor-download').addEventListener('click', () => {
-    if (saveEditorData()) downloadGame();
-  });
   $('editor-cancel').addEventListener('click', closeEditor);
+  refreshSavedGames();
 }
 
 function flash(btn, text) {
