@@ -799,6 +799,8 @@ function renderHud() {
   $('hud-time').textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
   $('hud-time').classList.toggle('low', t <= 15);
   $('hud-score').textContent = `${game.score(p)}/${game.order.length}`;
+  // mini circles show each player's own remaining time
+  state.circles.forEach((c, i) => c.setTime(game.players[i].timeLeft));
   pushRemoteState();
 }
 

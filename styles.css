@@ -161,6 +161,10 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 }
 .circle-name { font-weight: 700; font-size: 1.1em; }
 .circle-score { color: var(--muted); font-size: 1em; }
+/* remaining time — shown only on the smaller (non-active) circles */
+.circle-time { display: none; font-variant-numeric: tabular-nums; font-weight: 800; font-size: 1.2em; margin-top: 2px; }
+.circle-time.low { color: var(--no); }
+.circle.mini .circle-time { display: block; }
 
 .chip {
   position: absolute; width: 9%; aspect-ratio: 1; transform: translate(-50%, -50%);

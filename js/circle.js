@@ -21,6 +21,10 @@ export class Circle {
     this.scoreEl.className = 'circle-score';
     this.center.appendChild(this.scoreEl);
 
+    this.timeEl = document.createElement('div');
+    this.timeEl.className = 'circle-time';
+    this.center.appendChild(this.timeEl);
+
     const n = letters.length;
     letters.forEach((ch, i) => {
       const angle = (-90 + (i * 360) / n) * (Math.PI / 180);
@@ -38,6 +42,15 @@ export class Circle {
 
   setName(name) {
     this.nameEl.textContent = name || '';
+  }
+
+  setTime(seconds) {
+    if (seconds == null) {
+      this.timeEl.textContent = '';
+      return;
+    }
+    this.timeEl.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    this.timeEl.classList.toggle('low', seconds <= 15);
   }
 
   setScore(score, total) {
