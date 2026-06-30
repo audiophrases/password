@@ -1,5 +1,5 @@
 // app.js — wires the setup screen, game engine, speech, and camera together.
-import { buildPrompt, parseGameText, ALPHABET_EN } from './ai.js';
+import { buildPrompt, parseGameText, validateGame, ALPHABET_EN } from './ai.js';
 import { Game } from './game.js';
 import { Circle } from './circle.js';
 import { Recognizer, recognitionSupported, speak, stopSpeaking, voicesFor, onVoices } from './speech.js';
@@ -178,6 +178,150 @@ function loadGameText(text, players) {
   msg.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
   $('start-game').disabled = false;
   pushRemoteState();
+}
+
+// ---------- Manual create / edit + save to file ----------
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function currentLetterSet() {
+  return ($('letters').value || ALPHABET_EN.join('')).toUpperCase().replace(/[^A-ZÑ]/g, '').split('');
+}
+
+function editorRowEl({ letter = '', type = 'starts', answer = '', accept = '', clue = '' } = {}) {
+  const row = document.createElement('div');
+  row.className = 'erow';
+  row.innerHTML = `
+    <input class="e-letter" maxlength="2" value="${esc(letter)}" />
+    <select class="e-type">
+      <option value="starts">starts with</option>
+      <option value="contains">contains</option>
+    </select>
+    <input class="e-answer" value="${esc(answer)}" placeholder="answer" />
+    <input class="e-accept" value="${esc(accept)}" placeholder="also accept (comma-separated)" />
+    <input class="e-clue" value="${esc(clue)}" placeholder="clue / definition" />
+    <button class="e-del" title="Remove">✕</button>`;
+  row.querySelector('.e-type').value = type === 'contains' ? 'contains' : 'starts';
+  row.querySelector('.e-del').addEventListener('click', () => row.remove());
+  return row;
+}
+
+function renderEditorRows(list) {
+  const c = $('editor-rows');
+  c.innerHTML = '';
+  list.forEach((r) => c.appendChild(editorRowEl(r)));
+}
+
+// Open the editor pre-filled from the loaded game, or scaffolded blank A–Z.
+function openEditor() {
+  const data = state.data;
+  $('editor-title').value = data?.title || '';
+  const rows = data?.letters?.length
+    ? data.letters.map((l) => ({ letter: l.letter, type: l.type, answer: l.answer, accept: (l.accept || []).join(', '), clue: l.clue }))
+    : currentLetterSet().map((ch) => ({ letter: ch, type: 'starts', answer: '', accept: '', clue: '' }));
+  renderEditorRows(rows);
+  $('editor-msg').textContent = '';
+  $('editor-msg').className = 'msg';
+  $('setup').classList.add('hidden');
+  $('editor').classList.remove('hidden');
+}
+
+function scaffoldEditor() {
+  const present = new Set([...$('editor-rows').querySelectorAll('.e-letter')].map((i) => i.value.trim().toUpperCase()));
+  currentLetterSet().forEach((ch) => {
+    if (!present.has(ch)) $('editor-rows').appendChild(editorRowEl({ letter: ch }));
+  });
+}
+
+function closeEditor() {
+  $('editor').classList.add('hidden');
+  $('setup').classList.remove('hidden');
+}
+
+// Collect + validate the editor into state.data; returns true on success.
+function saveEditorData() {
+  const opt = $('language').selectedOptions[0];
+  const letters = [...$('editor-rows').querySelectorAll('.erow')]
+    .map((row) => ({
+      letter: row.querySelector('.e-letter').value.trim().toUpperCase(),
+      type: row.querySelector('.e-type').value,
+      answer: row.querySelector('.e-answer').value.trim(),
+      accept: row.querySelector('.e-accept').value.split(',').map((s) => s.trim()).filter(Boolean),
+      clue: row.querySelector('.e-clue').value.trim(),
+    }))
+    .filter((l) => l.letter);
+
+  const msg = $('editor-msg');
+  if (!letters.length) {
+    msg.className = 'msg error';
+    msg.textContent = 'Add at least one letter.';
+    return false;
+  }
+  const incomplete = letters.filter((l) => !l.answer || !l.clue).map((l) => l.letter);
+  if (incomplete.length) {
+    msg.className = 'msg error';
+    msg.textContent = `Add an answer and a clue for: ${incomplete.join(', ')}`;
+    return false;
+  }
+
+  const game = {
+    title: $('editor-title').value.trim() || 'Manual round',
+    language: opt.dataset.name,
+    langCode: opt.value,
+    settings: { durationSec: +$('duration').value || 200, mode: $('mode').value, strictness: parseFloat($('strictness').value) },
+    letters,
+  };
+  const result = validateGame(game);
+  if (!result.ok) {
+    msg.className = 'msg error';
+    msg.textContent = result.errors.slice(0, 4).join(' ');
+    return false;
+  }
+  state.data = result.game;
+  $('json-input').value = JSON.stringify(result.game, null, 2);
+  const v = $('validation');
+  v.className = 'msg ok';
+  v.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
+  $('start-game').disabled = false;
+  return true;
+}
+
+// Save the current game to a local .json file.
+function downloadGame() {
+  if (!state.data) {
+    const v = $('validation');
+    v.className = 'msg error';
+    v.textContent = 'Load or create a game first.';
+    return;
+  }
+  const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download =
+    (state.data.title || 'password-game').replace(/[^a-z0-9]+/gi, '-').toLowerCase().replace(/^-+|-+$/g, '') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function bindEditor() {
+  $('edit-game').addEventListener('click', openEditor);
+  $('save-file').addEventListener('click', downloadGame);
+  $('editor-add').addEventListener('click', () => $('editor-rows').appendChild(editorRowEl({})));
+  $('editor-scaffold').addEventListener('click', scaffoldEditor);
+  $('editor-save').addEventListener('click', () => {
+    if (saveEditorData()) {
+      closeEditor();
+      pushRemoteState();
+    }
+  });
+  $('editor-download').addEventListener('click', () => {
+    if (saveEditorData()) downloadGame();
+  });
+  $('editor-cancel').addEventListener('click', closeEditor);
 }
 
 function flash(btn, text) {
@@ -537,6 +681,7 @@ function endToSetup() {
 // ---------- boot ----------
 setupScreen();
 bindGameControls();
+bindEditor();
 initRemoteLink();
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
 $('auto-read')?.addEventListener('change', (e) => (state.autoRead = e.target.checked));

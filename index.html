@@ -63,6 +63,10 @@
         </div>
         <input id="file-input" type="file" accept=".txt,.json,text/plain,application/json" hidden />
         <div id="validation" class="msg"></div>
+        <div class="field-row">
+          <button id="edit-game" class="btn ghost">✏️ Create / edit manually</button>
+          <button id="save-file" class="btn ghost">💾 Save to file</button>
+        </div>
       </div>
 
       <!-- 3. Players & rules -->
@@ -91,6 +95,27 @@
     <footer class="legend">Keys in game: <b>C</b> correct · <b>W</b> wrong · <b>Space</b> pass · hold <b>V</b> to talk · <b>Enter</b> confirm · <b>H</b> hide text · <b>F</b> fullscreen · <b>P</b> pause</footer>
   </section>
 
+  <!-- ===================== EDITOR ===================== -->
+  <section id="editor" class="screen hidden">
+    <div class="editor-head">
+      <input id="editor-title" class="editor-title" type="text" placeholder="Round title" />
+      <div class="editor-actions">
+        <button id="editor-scaffold" class="btn ghost small">+ Letters A–Z</button>
+        <button id="editor-add" class="btn ghost small">+ Row</button>
+        <button id="editor-download" class="btn ghost">💾 Save to file</button>
+        <button id="editor-save" class="btn primary">Save &amp; load</button>
+        <button id="editor-cancel" class="btn ghost">Cancel</button>
+      </div>
+    </div>
+    <div id="editor-msg" class="msg"></div>
+    <div class="editor-table">
+      <div class="erow erow-head">
+        <span>Letter</span><span>Type</span><span>Answer</span><span>Accepted</span><span>Clue / definition</span><span></span>
+      </div>
+      <div id="editor-rows"></div>
+    </div>
+  </section>
+
   <!-- ===================== GAME ===================== -->
   <section id="game" class="screen hidden">
     <div id="hud">
@@ -105,7 +130,6 @@
     <div id="clue">
       <div class="clue-left"><span id="clue-letter">A</span><small id="clue-kind">Starts with A</small></div>
       <p id="clue-text" class="clue-text"></p>
-      <span id="clue-listen" class="clue-listen">🔊 listen</span>
     </div>
 
     <div id="heard" class="heard"></div>

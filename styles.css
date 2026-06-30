@@ -80,6 +80,31 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 
 .remote-info { margin: 4px 0 10px; word-break: break-all; }
 .remote-info b { color: var(--ink); }
+
+/* ---------------- Editor ---------------- */
+#editor { padding: 14px 22px 48px; max-width: 1120px; margin: 0 auto; }
+.editor-head {
+  position: sticky; top: 0; z-index: 2; background: var(--bg);
+  display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.editor-title { flex: 1; min-width: 200px; margin: 0; font-size: 18px; font-weight: 700; }
+.editor-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.editor-table { margin-top: 12px; }
+.erow {
+  display: grid; grid-template-columns: 54px 124px 1.1fr 1.2fr 2.4fr 34px;
+  gap: 8px; align-items: center; margin-bottom: 6px;
+}
+.erow input, .erow select { margin-top: 0; }
+.erow-head { color: var(--muted); font-size: 12px; font-weight: 600; padding: 0 2px; }
+.e-letter { text-align: center; font-weight: 700; text-transform: uppercase; }
+.e-del { background: #fff; border: 1px solid var(--line); border-radius: 8px; color: var(--no); font-weight: 700; padding: 8px 0; }
+.e-del:hover { background: #faddd9; }
+@media (max-width: 720px) {
+  .erow { grid-template-columns: 44px 100px 1fr 34px; }
+  .erow .e-accept, .erow-head span:nth-child(4) { display: none; }
+  .erow .e-clue { grid-column: 1 / -1; }
+}
 .legend { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 0 28px; }
 .legend b { color: var(--ink); }
 
@@ -171,9 +196,7 @@ body.cam-on .circle.active .circle-score {
 #clue-letter { font-size: 34px; font-weight: 800; color: var(--ok); }
 #clue-kind { color: var(--muted); font-size: 11px; margin-top: 2px; }
 .clue-text { margin: 0; font-size: 19px; }
-.clue-listen { display: none; color: var(--muted); font-size: 16px; font-weight: 600; }
-body.clue-hidden .clue-text { display: none; }
-body.clue-hidden .clue-listen { display: inline; }
+body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box */
 
 .heard { position: absolute; bottom: 168px; left: 50%; transform: translateX(-50%); color: var(--muted); font-size: 15px; z-index: 5; }
 .suggestion { position: absolute; bottom: 196px; left: 50%; transform: translateX(-50%); z-index: 5; font-weight: 600; font-size: 15px; padding: 4px 12px; border-radius: 8px; }
