@@ -104,9 +104,9 @@ it fullscreen for the projector.
 
 ## Phone remote (control from across the room)
 
-Run `node server.js`, then on your phone open the `http://<LAN-IP>:8000/remote` URL it prints
-(also shown on the setup screen). Phone and laptop must be on the **same network** — same
-Wi-Fi, or join the laptop to your phone's hotspot.
+Run `node server.js`. The setup screen shows the remote's address **and a QR code** — scan it
+with your phone's camera to open `http://<LAN-IP>:8000/remote` (or type the URL). Phone and
+laptop must be on the **same network** — same Wi-Fi, or join the laptop to your phone's hotspot.
 
 You get big **Correct / Pass / Wrong** buttons, **hold-to-talk**, and Start / Pause / Clue /
 Camera / Fullscreen / Exit — plus the current player, letter, clue, **the expected answer**,
@@ -154,4 +154,5 @@ connections itself, so the relay is the rendezvous.
 | `server.js` | static server + phone-remote WebSocket relay + neural-TTS proxy (no deps) |
 | `remote.html` / `remote.css` / `js/remote.js` | the phone controller page |
 | `js/link.js` | WebSocket client shared by the game and the remote |
+| `js/vendor/qrcode.js` | vendored MIT QR generator (offline) for the remote-pairing QR |
 | `sample-game.json` | a ready-to-play A2 round |

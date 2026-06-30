@@ -533,13 +533,28 @@ async function initRemoteLink() {
     },
   });
   renderRemoteInfo();
+  renderQR();
 }
 
 function renderRemoteInfo() {
   const el = $('remote-info');
   if (!el || !state.remoteUrl) return;
-  const conn = state.remotes > 0 ? `connected: ${state.remotes} 📱` : 'waiting for phone…';
-  el.innerHTML = `📱 Phone remote — open <b>${state.remoteUrl}</b> on the same Wi‑Fi · ${conn}`;
+  const conn = state.remotes > 0 ? `connected: ${state.remotes} 📱` : 'scan or open on your phone (same Wi‑Fi)';
+  el.innerHTML = `📱 Phone remote — <b>${state.remoteUrl}</b> · ${conn}`;
+}
+
+// Render a scannable QR for the remote URL (vendored qrcode-generator, offline).
+function renderQR() {
+  const box = $('remote-qr');
+  if (!box || !state.remoteUrl || !window.qrcode) return;
+  try {
+    const qr = window.qrcode(0, 'M');
+    qr.addData(state.remoteUrl);
+    qr.make();
+    box.innerHTML = `<img alt="Scan to open the phone remote" src="${qr.createDataURL(5, 8)}" />`;
+  } catch (e) {
+    console.warn('QR generation failed:', e);
+  }
 }
 
 // Map a remote button to the same actions as the keyboard/on-screen controls.

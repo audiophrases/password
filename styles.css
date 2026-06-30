@@ -97,8 +97,10 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 .swatch { width: 18px; height: 18px; border-radius: 50%; flex: none; }
 .p-del { background: none; border: none; color: var(--muted); font-size: 14px; }
 
-.remote-info { margin: 4px 0 10px; word-break: break-all; }
+.remote-info { margin: 4px 0 6px; word-break: break-all; }
 .remote-info b { color: var(--ink); }
+.remote-qr { margin: 0 0 10px; }
+.remote-qr img { width: 148px; height: 148px; image-rendering: pixelated; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
 
 /* ---------------- Editor ---------------- */
 #editor { padding: 14px 22px 48px; max-width: 1120px; margin: 0 auto; }
