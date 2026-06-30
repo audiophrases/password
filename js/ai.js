@@ -100,10 +100,15 @@ export function validateGame(obj) {
 
   if (errors.length) return { ok: false, errors };
 
+  // intended player count: explicit "players", else the max variants per letter
+  const maxVariants = letters.reduce((m, l) => Math.max(m, l.variants.length), 1);
+  const players = Math.max(1, Math.min(6, Number(obj.players) || maxVariants));
+
   const game = {
     title: obj.title || 'Untitled round',
     language: obj.language || 'English',
     langCode: obj.langCode || 'en-US',
+    players,
     settings: {
       durationSec: Number(obj.settings?.durationSec) || 200,
       mode: obj.settings?.mode || 'voice-assist',

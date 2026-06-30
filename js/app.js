@@ -65,6 +65,19 @@ function renderPlayers(players) {
   );
 }
 
+// Resize the player list (1–6) and reflect it in the section-1 field.
+function setPlayerCount(n) {
+  n = Math.max(1, Math.min(6, n || 1));
+  const players = state.players;
+  while (players.length < n) {
+    const i = players.length;
+    players.push({ name: `Player ${i + 1}`, color: PLAYER_COLORS[i % PLAYER_COLORS.length] });
+  }
+  players.length = n;
+  $('num-players').value = n;
+  renderPlayers(players);
+}
+
 // Voice picker — neural voices (via the server) when available, else browser voices.
 function populateVoices(langCode) {
   const sel = $('voice');
@@ -115,6 +128,19 @@ function neuralVoiceFor(langCode, selectedId) {
   return selectedId && list.includes(selectedId) ? selectedId : list[0];
 }
 
+function neuralFailed() {
+  // server TTS failed (offline / token rejected): drop to the browser voice for good
+  state.neuralBroken = true;
+  state.useNeural = false;
+  const nb = $('neural');
+  if (nb) nb.checked = false;
+  if ($('neural-note')) $('neural-note').textContent = 'Neural voice unavailable — using the browser voice.';
+  populateVoices($('language').value);
+}
+
+const ttsUrl = (voiceId, text) => `/tts?voice=${encodeURIComponent(voiceId)}&text=${encodeURIComponent(text)}`;
+
+// Generic narration of a single piece of text (used by the voice test button).
 function narrate(text, langCode) {
   if (!text) return;
   const useNeural = state.useNeural && state.neuralAvailable && !state.neuralBroken && ttsAudio;
@@ -122,29 +148,58 @@ function narrate(text, langCode) {
     const sel = $('voice').selectedOptions[0];
     const selId = sel && sel.dataset.type === 'neural' ? sel.value : null;
     const voiceId = neuralVoiceFor(langCode, selId); // always match the game's language
-    stopSpeaking();
+    stopNarration();
     ttsAudio.onerror = () => {
-      // server TTS failed (offline / token rejected): drop to the browser voice for good
       ttsAudio.onerror = null;
-      state.neuralBroken = true;
-      state.useNeural = false;
-      const nb = $('neural');
-      if (nb) nb.checked = false;
-      if ($('neural-note')) $('neural-note').textContent = 'Neural voice unavailable — using the browser voice.';
-      populateVoices($('language').value);
+      neuralFailed();
       speak(text, langCode, state.voiceName);
     };
-    ttsAudio.src = `/tts?voice=${encodeURIComponent(voiceId)}&text=${encodeURIComponent(text)}`;
+    ttsAudio.src = ttsUrl(voiceId, text);
     ttsAudio.play().catch(() => {});
     return;
   }
   speak(text, langCode, state.voiceName);
 }
 
+// Read a clue aloud. On the neural path the announcement ("<lead>. <LETTER>") and
+// the clue are played as TWO separate audio clips, so the very short single
+// letter is isolated by the clip-boundary silence and doesn't slur into the
+// lead-in or the clue (the edge endpoint ignores SSML <break>/<say-as>).
+function narrateClue(entry, langCode) {
+  if (!entry) return;
+  const set = SAY_PREFIX[(langCode || 'en').slice(0, 2).toLowerCase()] || SAY_PREFIX.en;
+  const lead = `${set[entry.type === 'contains' ? 'contains' : 'starts']}${set.sep}${entry.letter}`;
+  const clue = entry.clue || '';
+  const useNeural = state.useNeural && state.neuralAvailable && !state.neuralBroken && ttsAudio;
+  if (useNeural) {
+    const sel = $('voice').selectedOptions[0];
+    const selId = sel && sel.dataset.type === 'neural' ? sel.value : null;
+    const voiceId = neuralVoiceFor(langCode, selId);
+    stopNarration();
+    ttsAudio.onerror = () => {
+      ttsAudio.onerror = null;
+      ttsAudio.onended = null;
+      neuralFailed();
+      speak(`${lead}. ${clue}`, langCode, state.voiceName);
+    };
+    ttsAudio.onended = () => {
+      ttsAudio.onended = null; // after the letter, play the clue as its own clip
+      if (!clue) return;
+      ttsAudio.src = ttsUrl(voiceId, clue);
+      ttsAudio.play().catch(() => {});
+    };
+    ttsAudio.src = ttsUrl(voiceId, lead);
+    ttsAudio.play().catch(() => {});
+    return;
+  }
+  speak(`${lead}. ${clue}`, langCode, state.voiceName);
+}
+
 function stopNarration() {
   stopSpeaking();
   if (ttsAudio) {
     ttsAudio.onerror = null;
+    ttsAudio.onended = null;
     try {
       ttsAudio.pause();
       ttsAudio.removeAttribute('src');
@@ -161,16 +216,7 @@ function setupScreen() {
   renderPlayers(players);
 
   // Number of players (source of truth lives in section 1).
-  $('num-players').addEventListener('change', () => {
-    const n = Math.max(1, Math.min(6, +$('num-players').value || 1));
-    $('num-players').value = n;
-    while (players.length < n) {
-      const i = players.length;
-      players.push({ name: `Player ${i + 1}`, color: PLAYER_COLORS[i % PLAYER_COLORS.length] });
-    }
-    players.length = n;
-    renderPlayers(players);
-  });
+  $('num-players').addEventListener('change', () => setPlayerCount(+$('num-players').value));
 
   // Language drives the default letter set, speech recognition, and the read-aloud voice.
   $('language').addEventListener('change', () => {
@@ -272,6 +318,7 @@ function loadGameText(text, players) {
     state.voicePicked = false;
     populateVoices(result.game.langCode);
   }
+  setPlayerCount(result.game.players); // a 3-word-set game sets up 3 players
   msg.className = 'msg ok';
   msg.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
   $('start-game').disabled = false;
@@ -455,6 +502,7 @@ function saveEditorData() {
     title: $('editor-title').value.trim() || 'Manual round',
     language: opt.dataset.name,
     langCode: opt.value,
+    players: state.edit.sets, // one word set per player
     settings: { durationSec: +$('duration').value || 200, mode: $('mode').value, strictness: parseFloat($('strictness').value) },
     letters,
   };
@@ -465,6 +513,7 @@ function saveEditorData() {
     return false;
   }
   state.data = result.game;
+  setPlayerCount(result.game.players);
   $('json-input').value = JSON.stringify(result.game, null, 2);
   const v = $('validation');
   v.className = 'msg ok';
@@ -804,24 +853,19 @@ function renderHud() {
   pushRemoteState();
 }
 
-// Spoken lead-in per language, e.g. "Begins with the letter R. <clue>".
-// `sep` goes between the lead and the letter: a space for English (smooth), but
-// a sentence break for romance languages where "letra/lletra/lettre" ends in a
-// vowel and would otherwise slur into the letter (e.g. "la lletra A" -> "lletraa").
+// Spoken lead-in per language, e.g. "Begins with the letter R". `sep` goes between
+// the lead and the letter: a space for English (smooth), but a sentence break for
+// romance languages where "letra/lletra/lettre" ends in a vowel and would slur
+// into the letter (e.g. "la lletra A" -> "lletraa").
 const SAY_PREFIX = {
   en: { starts: 'Begins with the letter', contains: 'Contains the letter', sep: ' ' },
   es: { starts: 'Empieza por la letra', contains: 'Contiene la letra', sep: '. ' },
   fr: { starts: 'Commence par la lettre', contains: 'Contient la lettre', sep: '. ' },
   ca: { starts: 'Comença per la lletra', contains: 'Conté la lletra', sep: '. ' },
 };
-function spokenClue(entry, langCode) {
-  const set = SAY_PREFIX[(langCode || 'en').slice(0, 2).toLowerCase()] || SAY_PREFIX.en;
-  const lead = set[entry.type === 'contains' ? 'contains' : 'starts'];
-  return `${lead}${set.sep}${entry.letter}. ${entry.clue}`;
-}
 function readCurrentClue() {
   const e = state.game?.currentEntry;
-  if (e) narrate(spokenClue(e, state.game.data.langCode), state.game.data.langCode);
+  if (e) narrateClue(e, state.game.data.langCode);
 }
 
 // Hide/show the written definition so the round can be played from audio only.
