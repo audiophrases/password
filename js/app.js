@@ -109,10 +109,19 @@ function populateVoices(langCode) {
 }
 
 // Read text aloud: neural (server /tts) when a neural voice is selected, else browser.
+// Pick a neural voice for langCode; honor the dropdown choice only if it fits.
+function neuralVoiceFor(langCode, selectedId) {
+  const list = NEURAL_VOICES[langCode] || NEURAL_VOICES['en-US'];
+  return selectedId && list.includes(selectedId) ? selectedId : list[0];
+}
+
 function narrate(text, langCode) {
   if (!text) return;
-  const sel = $('voice').selectedOptions[0];
-  if (sel && sel.dataset.type === 'neural' && !state.neuralBroken && ttsAudio) {
+  const useNeural = state.useNeural && state.neuralAvailable && !state.neuralBroken && ttsAudio;
+  if (useNeural) {
+    const sel = $('voice').selectedOptions[0];
+    const selId = sel && sel.dataset.type === 'neural' ? sel.value : null;
+    const voiceId = neuralVoiceFor(langCode, selId); // always match the game's language
     stopSpeaking();
     ttsAudio.onerror = () => {
       // server TTS failed (offline / token rejected): drop to the browser voice for good
@@ -122,10 +131,10 @@ function narrate(text, langCode) {
       const nb = $('neural');
       if (nb) nb.checked = false;
       if ($('neural-note')) $('neural-note').textContent = 'Neural voice unavailable — using the browser voice.';
-      populateVoices(langCode);
+      populateVoices($('language').value);
       speak(text, langCode, state.voiceName);
     };
-    ttsAudio.src = `/tts?voice=${encodeURIComponent(sel.value)}&text=${encodeURIComponent(text)}`;
+    ttsAudio.src = `/tts?voice=${encodeURIComponent(voiceId)}&text=${encodeURIComponent(text)}`;
     ttsAudio.play().catch(() => {});
     return;
   }
@@ -255,6 +264,14 @@ function loadGameText(text, players) {
   // sync UI defaults from the loaded game
   $('mode').value = result.game.settings.mode;
   $('strictness').value = result.game.settings.strictness;
+  // sync the language selector + voice picker to the loaded game's language
+  const langSel = $('language');
+  if ([...langSel.options].some((o) => o.value === result.game.langCode)) {
+    langSel.value = result.game.langCode;
+    $('letters').value = langSel.selectedOptions[0].dataset.letters;
+    state.voicePicked = false;
+    populateVoices(result.game.langCode);
+  }
   msg.className = 'msg ok';
   msg.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
   $('start-game').disabled = false;
