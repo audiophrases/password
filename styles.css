@@ -88,7 +88,8 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
   display: flex; gap: 12px; align-items: center; justify-content: space-between;
   flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid var(--line);
 }
-.editor-title { flex: 1; min-width: 200px; margin: 0; font-size: 18px; font-weight: 700; }
+.editor-title { flex: 1; min-width: 180px; margin: 0; font-size: 18px; font-weight: 700; }
+.editor-lang { margin: 0; width: auto; }
 .editor-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .editor-table { margin-top: 12px; }
 .erow {

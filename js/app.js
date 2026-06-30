@@ -264,8 +264,10 @@ function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function currentLetterSet() {
-  return ($('letters').value || ALPHABET_EN.join('')).toUpperCase().replace(/[^A-ZÑ]/g, '').split('');
+// Default letter set for a language code (reads the data-letters of the matching option).
+function lettersForLang(langCode) {
+  const opt = [...$('language').options].find((o) => o.value === langCode);
+  return (opt?.dataset.letters || ALPHABET_EN.join('')).toUpperCase().replace(/[^A-ZÑ]/g, '').split('');
 }
 
 function editorRowEl({ letter = '', type = 'starts', answer = '', accept = '', clue = '' } = {}) {
@@ -296,9 +298,12 @@ function renderEditorRows(list) {
 function openEditor() {
   const data = state.data;
   $('editor-title').value = data?.title || '';
+  const lang = $('editor-lang');
+  const known = [...lang.options].map((o) => o.value);
+  lang.value = data && known.includes(data.langCode) ? data.langCode : $('language').value;
   const rows = data?.letters?.length
     ? data.letters.map((l) => ({ letter: l.letter, type: l.type, answer: l.answer, accept: (l.accept || []).join(', '), clue: l.clue }))
-    : currentLetterSet().map((ch) => ({ letter: ch, type: 'starts', answer: '', accept: '', clue: '' }));
+    : lettersForLang(lang.value).map((ch) => ({ letter: ch, type: 'starts', answer: '', accept: '', clue: '' }));
   renderEditorRows(rows);
   $('editor-msg').textContent = '';
   $('editor-msg').className = 'msg';
@@ -308,7 +313,7 @@ function openEditor() {
 
 function scaffoldEditor() {
   const present = new Set([...$('editor-rows').querySelectorAll('.e-letter')].map((i) => i.value.trim().toUpperCase()));
-  currentLetterSet().forEach((ch) => {
+  lettersForLang($('editor-lang').value).forEach((ch) => {
     if (!present.has(ch)) $('editor-rows').appendChild(editorRowEl({ letter: ch }));
   });
 }
@@ -320,7 +325,7 @@ function closeEditor() {
 
 // Collect + validate the editor into state.data; returns true on success.
 function saveEditorData() {
-  const opt = $('language').selectedOptions[0];
+  const opt = $('editor-lang').selectedOptions[0];
   const letters = [...$('editor-rows').querySelectorAll('.erow')]
     .map((row) => ({
       letter: row.querySelector('.e-letter').value.trim().toUpperCase(),
