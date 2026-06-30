@@ -53,29 +53,25 @@
         <button id="copy-prompt" class="btn ghost">Copy prompt</button>
       </div>
 
-      <!-- 2. Load the JSON it returns -->
+      <!-- 2. Your games (saved in this browser) -->
       <div class="card">
-        <h2>2 · Load the game</h2>
-        <p class="hint">Paste the JSON the chatbot returns — or load a <b>.txt</b> / <b>.json</b> file:</p>
-        <textarea id="json-input" class="mono" rows="8" placeholder='{ "title": "...", "letters": [ ... ] }'></textarea>
+        <h2>2 · Your games</h2>
+        <div id="library" class="library"></div>
         <div class="field-row">
-          <button id="load-json" class="btn">Load JSON</button>
-          <button id="load-file" class="btn ghost">Load file</button>
-          <button id="load-sample" class="btn ghost">Try sample round</button>
+          <button id="edit-game" class="btn">✏️ New game</button>
+          <button id="save-local" class="btn ghost" disabled>💾 Save current game</button>
         </div>
-        <input id="file-input" type="file" accept=".txt,.json,text/plain,application/json" hidden />
         <div id="validation" class="msg"></div>
-        <hr />
-        <p class="hint">Saved games (in this browser):</p>
-        <div class="field-row saved-row">
-          <select id="saved-games"></select>
-          <button id="open-local" class="btn ghost small">Open</button>
-          <button id="delete-local" class="btn ghost small">Delete</button>
-        </div>
-        <div class="field-row">
-          <button id="edit-game" class="btn ghost">✏️ Create / edit manually</button>
-          <button id="save-local" class="btn ghost">💾 Save in browser</button>
-        </div>
+        <details id="import-details" class="import">
+          <summary>Import from a chatbot, file, or sample</summary>
+          <textarea id="json-input" class="mono" rows="6" placeholder='Paste the JSON a chatbot returns: { "title": "...", "letters": [ ... ] }'></textarea>
+          <div class="field-row">
+            <button id="load-json" class="btn">Load JSON</button>
+            <button id="load-file" class="btn ghost">Load file</button>
+            <button id="load-sample" class="btn ghost">Try sample round</button>
+          </div>
+          <input id="file-input" type="file" accept=".txt,.json,text/plain,application/json" hidden />
+        </details>
       </div>
 
       <!-- 3. Players & rules -->

@@ -73,7 +73,25 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 .msg.ok { color: #157f45; }
 .msg.error { color: #c0392b; }
 
-.saved-row select { flex: 1; margin-top: 0; }
+/* saved-games library */
+.library { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; max-height: 260px; overflow-y: auto; }
+.lib-empty { color: var(--muted); font-size: 13px; margin: 4px 2px; }
+.lib-item { display: flex; gap: 6px; }
+.lib-open { flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+.lib-open:hover { border-color: #aebacd; }
+.lib-item.current .lib-open { border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
+.lib-title { font-weight: 700; font-size: 14px; }
+.lib-meta { color: var(--muted); font-size: 12px; }
+.lib-edit, .lib-del { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font-size: 14px; cursor: pointer; }
+.lib-edit:hover { border-color: #aebacd; }
+.lib-del:hover { background: #faddd9; }
+.import { margin-top: 8px; }
+.import summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 6px 0; list-style: none; }
+.import summary::-webkit-details-marker { display: none; }
+.import summary::before { content: '▸ '; }
+.import[open] summary::before { content: '▾ '; }
+.import summary:hover { color: var(--ink); }
+
 .player-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .player-row .p-name { flex: 1; margin: 0; }
 .swatch { width: 18px; height: 18px; border-radius: 50%; flex: none; }

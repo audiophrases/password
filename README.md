@@ -50,17 +50,15 @@ announced with the letter in the game's language — e.g. *"Begins with the lett
 
 1. **Generate the words.** On the setup screen pick language / level / topic / letters / number of
    players and click **Build chatbot prompt**. Copy it into ChatGPT, Claude, or any chatbot.
-2. **Load the game.** Paste the JSON it returns and click **Load JSON**, or **Load file**
-   to pick a `.txt` or `.json` file (both are parsed as JSON, tolerant of ```json fences /
-   surrounding prose). Or click **Try sample round**.
+2. **Your games** — section 2 is a library saved in this browser:
+   - **✏️ New game** opens the editor (a table of letter · language · starts/contains · answer ·
+     accepted synonyms · clue); its **💾 Save** adds the round to the library.
+   - Each saved game shows as a row — **click it to open** (ready to play), **✏️** to edit, **🗑**
+     to delete. **💾 Save current game** stores whatever is currently loaded.
+   - **Import** (the collapsible at the bottom) brings a game in from a chatbot (paste the JSON),
+     a `.txt`/`.json` file, or the built-in sample. Imported games load immediately; Save to keep.
 
-   No chatbot needed: click **✏️ Create / edit manually** to build or tweak a round in a
-   table (letter · language · starts/contains · answer · accepted synonyms · clue). It pre-fills
-   from a loaded game or scaffolds a blank A–Z for the chosen language.
-
-   **Saving:** **💾 Save in browser** stores the round in this browser; reopen saved rounds from
-   the **Saved games** list and remove them with **Delete** (they persist across sessions in that
-   browser, no files). **Load file** still imports an external `.json`/`.txt` if someone shares one.
+   Saved games persist across sessions in this browser (no files).
 3. **Add players, pick a judging mode, press Start.**
 
 ### In-game keys (the teacher is always the final judge)

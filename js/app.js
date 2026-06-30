@@ -257,6 +257,7 @@ function loadGameText(text, players) {
   msg.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
   $('start-game').disabled = false;
   pushRemoteState();
+  renderLibrary();
 }
 
 // ---------- Manual create / edit + save to file ----------
@@ -295,9 +296,9 @@ function renderEditorRows(list) {
   list.forEach((r) => c.appendChild(editorRowEl(r)));
 }
 
-// Open the editor pre-filled from the loaded game, or scaffolded blank A–Z.
-function openEditor() {
-  const data = state.data;
+// Open the editor pre-filled from the loaded game, or blank (blank === true for a new game).
+function openEditor(blank) {
+  const data = blank === true ? null : state.data;
   $('editor-title').value = data?.title || '';
   const lang = $('editor-lang');
   const known = [...lang.options].map((o) => o.value);
@@ -391,24 +392,47 @@ function persistStore(obj) {
   }
 }
 
-function refreshSavedGames(selectName) {
-  const sel = $('saved-games');
-  if (!sel) return;
-  const names = Object.keys(loadStore()).sort((a, b) => a.localeCompare(b));
-  sel.innerHTML = '';
+const libMeta = (game) => `${(game.langCode || '??').slice(0, 2)} · ${game.letters?.length || 0} letters`;
+
+// Render the saved-games library: one clickable row per game (open / edit / delete).
+function renderLibrary() {
+  const box = $('library');
+  if (!box) return;
+  const store = loadStore();
+  const names = Object.keys(store).sort((a, b) => a.localeCompare(b));
   if (!names.length) {
-    sel.innerHTML = '<option value="">— no saved games —</option>';
+    box.innerHTML = '<p class="lib-empty">No saved games yet. Make a New game, or import one below, then Save.</p>';
   } else {
+    box.innerHTML = '';
     for (const n of names) {
-      const o = document.createElement('option');
-      o.value = n;
-      o.textContent = n;
-      sel.appendChild(o);
+      const item = document.createElement('div');
+      item.className = 'lib-item' + (state.data && state.data.title === n ? ' current' : '');
+      item.innerHTML =
+        `<button class="lib-open"><span class="lib-title">${esc(n)}</span>` +
+        `<span class="lib-meta">${esc(libMeta(store[n]))}</span></button>` +
+        `<button class="lib-edit" title="Edit">✏️</button>` +
+        `<button class="lib-del" title="Delete">🗑</button>`;
+      item.querySelector('.lib-open').addEventListener('click', () => openSaved(n));
+      item.querySelector('.lib-edit').addEventListener('click', () => editSaved(n));
+      item.querySelector('.lib-del').addEventListener('click', () => deleteSaved(n));
+      box.appendChild(item);
     }
   }
-  if (selectName && names.includes(selectName)) sel.value = selectName;
-  $('open-local').disabled = !names.length;
-  $('delete-local').disabled = !names.length;
+  const d = $('import-details');
+  if (d && !names.length) d.open = true; // help first-timers find import
+  updateSaveButton();
+}
+
+function updateSaveButton() {
+  const btn = $('save-local');
+  if (!btn) return;
+  if (!state.data) {
+    btn.disabled = true;
+    btn.textContent = '💾 Save current game';
+    return;
+  }
+  btn.disabled = false;
+  btn.textContent = loadStore()[state.data.title] ? '💾 Update saved game' : '💾 Save current game';
 }
 
 // Save the current game into this browser (keyed by title; same title updates).
@@ -416,40 +440,39 @@ function saveLocal() {
   const v = $('validation');
   if (!state.data) {
     v.className = 'msg error';
-    v.textContent = 'Load or create a game first.';
+    v.textContent = 'Make or import a game first.';
     return;
   }
   const store = loadStore();
   store[state.data.title] = state.data;
   persistStore(store);
-  refreshSavedGames(state.data.title);
+  renderLibrary();
   v.className = 'msg ok';
   v.textContent = `Saved "${state.data.title}" in this browser.`;
 }
 
-function openLocal() {
-  const name = $('saved-games').value;
-  if (!name) return;
+function openSaved(name) {
   const game = loadStore()[name];
   if (!game) return;
   loadGameText(JSON.stringify(game), state.players);
-  if (!$('editor').classList.contains('hidden')) openEditor(); // refresh editor view if open
+  if (!$('editor').classList.contains('hidden')) openEditor(); // refresh editor if open
 }
 
-function deleteLocal() {
-  const name = $('saved-games').value;
-  if (!name) return;
+function editSaved(name) {
+  openSaved(name);
+  openEditor();
+}
+
+function deleteSaved(name) {
   const store = loadStore();
   delete store[name];
   persistStore(store);
-  refreshSavedGames();
+  renderLibrary();
 }
 
 function bindEditor() {
-  $('edit-game').addEventListener('click', openEditor);
+  $('edit-game').addEventListener('click', () => openEditor(true));
   $('save-local').addEventListener('click', saveLocal);
-  $('open-local').addEventListener('click', openLocal);
-  $('delete-local').addEventListener('click', deleteLocal);
   $('editor-add').addEventListener('click', () => $('editor-rows').appendChild(editorRowEl({})));
   $('editor-scaffold').addEventListener('click', scaffoldEditor);
   $('editor-save').addEventListener('click', () => {
@@ -460,7 +483,7 @@ function bindEditor() {
     }
   });
   $('editor-cancel').addEventListener('click', closeEditor);
-  refreshSavedGames();
+  renderLibrary();
 }
 
 function flash(btn, text) {
