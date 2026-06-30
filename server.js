@@ -23,12 +23,13 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
 const TTS_HOST = 'speech.platform.bing.com';
 const TTS_PATH = '/consumer/speech/synthesize/readaloud/edge/v1';
-const EDGE_VERSION = '130.0.2849.68';
+const EDGE_VERSION = '143.0.3650.75';
 
 // Security token Microsoft now requires: SHA-256 of (Windows-filetime ticks
-// rounded down to 5 min) + the trusted client token.
-function secMsGec() {
-  let ticks = Math.floor(Date.now() / 1000) + 11644473600; // unix -> seconds since 1601
+// rounded down to 5 min) + the trusted client token. `skew` corrects a wrong
+// system clock (seconds to add), discovered from Microsoft's Date header.
+function secMsGec(skew = 0) {
+  let ticks = Math.floor(Date.now() / 1000 + skew) + 11644473600; // unix -> seconds since 1601
   ticks -= ticks % 300; // round down to 5 minutes
   ticks *= 10000000; // seconds -> 100-nanosecond units
   return crypto.createHash('sha256').update(`${BigInt(ticks)}${TRUSTED_TOKEN}`).digest('hex').toUpperCase();
@@ -66,12 +67,12 @@ function maskedFrame(payload, opcode = 0x1) {
   return Buffer.concat([header, mask, masked]);
 }
 
-function synthesize(text, voice) {
+function synthesize(text, voice, skew = 0, retried = false) {
   return new Promise((resolve, reject) => {
     const connId = crypto.randomUUID().replace(/-/g, '');
     const query =
       `?TrustedClientToken=${TRUSTED_TOKEN}` +
-      `&Sec-MS-GEC=${secMsGec()}&Sec-MS-GEC-Version=1-${EDGE_VERSION}&ConnectionId=${connId}`;
+      `&Sec-MS-GEC=${secMsGec(skew)}&Sec-MS-GEC-Version=1-${EDGE_VERSION}&ConnectionId=${connId}`;
     const key = crypto.randomBytes(16).toString('base64');
     const socket = tls.connect({ host: TTS_HOST, port: 443, servername: TTS_HOST }, () => {
       socket.write(
@@ -83,7 +84,7 @@ function synthesize(text, voice) {
           `Sec-WebSocket-Key: ${key}`,
           'Sec-WebSocket-Version: 13',
           'Origin: chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-          'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+          'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
           'Pragma: no-cache',
           'Cache-Control: no-cache',
           '',
@@ -133,7 +134,23 @@ function synthesize(text, voice) {
         const idx = buf.indexOf('\r\n\r\n');
         if (idx === -1) return;
         const head = buf.slice(0, idx).toString();
-        if (!/ 101 /.test(head)) return finish(new Error('handshake: ' + head.split('\r\n')[0]));
+        if (!/ 101 /.test(head)) {
+          // Auth rejected: if the clock is off, read Microsoft's Date header and retry once.
+          const dm = head.match(/^Date:\s*(.+)$/im);
+          const serverMs = dm ? Date.parse(dm[1]) : NaN;
+          if (!retried && /\b403\b/.test(head) && !Number.isNaN(serverMs)) {
+            done = true;
+            clearTimeout(timer);
+            try {
+              socket.destroy();
+            } catch {
+              /* ignore */
+            }
+            synthesize(text, voice, serverMs / 1000 - Date.now() / 1000, true).then(resolve, reject);
+            return;
+          }
+          return finish(new Error('handshake: ' + head.split('\r\n')[0]));
+        }
         handshake = true;
         buf = buf.slice(idx + 4);
         const ts = new Date().toString();
@@ -240,8 +257,8 @@ const server = http.createServer((req, res) => {
       })
       .catch((e) => {
         console.warn('TTS error:', e.message);
-        res.writeHead(502);
-        res.end('tts failed');
+        res.writeHead(502, { 'Content-Type': 'text/plain' });
+        res.end('tts failed: ' + e.message);
       });
     return;
   }
