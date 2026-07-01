@@ -111,6 +111,8 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 }
 .editor-title { flex: 1; min-width: 180px; margin: 0; font-size: 18px; font-weight: 700; }
 .editor-lang { margin: 0; width: auto; }
+.editor-time { margin: 0; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+.editor-time input { width: 68px; margin: 0; }
 .editor-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .editor-sets { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; color: var(--muted); font-size: 13px; }
 .editor-sets #editor-set-label { font-weight: 700; color: var(--ink); min-width: 42px; text-align: center; }
@@ -252,6 +254,15 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
 .ctrl.mic.live { background: var(--no); border-color: var(--no); color: #fff; }
 .ctrl.util { font-size: 13px; color: var(--muted); }
 .type-answer { width: 150px; margin: 0; }
+
+/* live-settings confirmation toast */
+.toast {
+  position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: #fff; padding: 8px 16px; border-radius: 999px;
+  font-size: 14px; font-weight: 700; z-index: 8; box-shadow: var(--shadow);
+  opacity: 1; transition: opacity .3s ease;
+}
+.toast.hidden { display: none; }
 
 /* result overlay */
 .overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(20, 35, 59, .45); }

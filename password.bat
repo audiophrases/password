@@ -11,6 +11,11 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo Stopping any previous Password server...
+rem Kill whatever is already listening on port 8000 (a leftover server) so this
+rem run starts clean instead of failing with "address in use".
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000" ^| findstr LISTENING') do taskkill /F /PID %%a >nul 2>nul
+
 echo ============================================
 echo   PASSWORD - starting local server
 echo ============================================

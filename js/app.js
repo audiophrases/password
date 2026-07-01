@@ -10,6 +10,13 @@ import { connect } from './link.js';
 const $ = (id) => document.getElementById(id);
 const PLAYER_COLORS = ['#e8632c', '#1f9d55', '#2b6cb0', '#9b2c98', '#b7791f', '#0d9488'];
 
+// The game now runs in its own tab. The setup tab launches it (handing the round
+// off via localStorage) and stays open as a control panel; the two tabs talk over
+// a BroadcastChannel so setting changes can be pushed to the live game.
+const isPlayMode = new URLSearchParams(location.search).has('play');
+const PLAY_KEY = 'password.play.v1';
+const bc = 'BroadcastChannel' in window ? new BroadcastChannel('password') : null;
+
 // Microsoft neural voices served via the local server's /tts endpoint.
 const NEURAL_VOICES = {
   'en-US': ['en-US-AvaNeural', 'en-US-AndrewNeural', 'en-US-EmmaNeural', 'en-US-BrianNeural'],
@@ -39,6 +46,8 @@ const state = {
   link: null,
   remoteUrl: '',
   remotes: 0,
+  launchedPlay: false, // this (setup) tab has opened a game tab
+  gameRunning: false, // a game tab has reported itself running
 };
 
 // ---------- Setup screen ----------
@@ -382,6 +391,7 @@ function removeSet() {
 function openEditor(blank) {
   const data = blank === true ? null : state.data;
   $('editor-title').value = data?.title || '';
+  $('editor-duration').value = data?.settings?.durationSec || 200;
   const lang = $('editor-lang');
   const known = [...lang.options].map((o) => o.value);
   lang.value = data && known.includes(data.langCode) ? data.langCode : $('language').value;
@@ -469,7 +479,7 @@ function saveEditorData() {
     language: opt.dataset.name,
     langCode: opt.value,
     players: state.edit.sets, // one word set per player
-    settings: { durationSec: +$('duration').value || 200, mode: $('mode').value, strictness: parseFloat($('strictness').value) },
+    settings: { durationSec: +$('editor-duration').value || 200, mode: $('mode').value, strictness: parseFloat($('strictness').value) },
     letters,
   };
   const result = validateGame(game);
@@ -611,8 +621,122 @@ function flash(btn, text) {
   setTimeout(() => (btn.textContent = old), 1200);
 }
 
+// Snapshot the settings that can be pushed to (or launched into) a live game.
+function currentSettings() {
+  return {
+    mode: $('mode').value,
+    strictness: parseFloat($('strictness').value),
+    langCode: $('language').value,
+    voiceName: state.voiceName,
+    useNeural: state.useNeural,
+    autoRead: state.autoRead,
+  };
+}
+
+// Launch the round in a NEW tab (so this tab stays a control panel). We hand the
+// round off through localStorage, then open ./?play=1 which reads it back. Inside
+// the game tab itself, "start" just (re)plays here.
 function beginGame() {
-  if (state.data && $('game').classList.contains('hidden')) startGame(state.players);
+  if (!state.data) return;
+  if (isPlayMode) {
+    if ($('game').classList.contains('hidden')) startGame(state.players);
+    return;
+  }
+  const data = JSON.parse(JSON.stringify(state.data));
+  const s = currentSettings();
+  data.settings.mode = s.mode;
+  data.settings.strictness = s.strictness;
+  data.langCode = s.langCode;
+  const payload = { data, players: state.players.map((p) => ({ name: p.name, color: p.color })), settings: s };
+  try {
+    localStorage.setItem(PLAY_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('Could not hand off the game:', e);
+  }
+  state.launchedPlay = true;
+  updateLiveControls();
+  window.open('./?play=1', '_blank');
+}
+
+// Setup tab: show the "apply to live game" button only while a game tab is open.
+function updateLiveControls() {
+  const btn = $('apply-live');
+  if (!btn) return;
+  btn.classList.toggle('hidden', !(state.launchedPlay || state.gameRunning));
+}
+
+// Setup tab: push the current settings to the running game tab.
+function applyToLiveGame() {
+  if (!bc) return;
+  bc.postMessage({ t: 'apply', settings: currentSettings() });
+  flash($('apply-live'), 'Applied ✓');
+}
+
+// Game tab: tell the setup tab whether a round is currently running.
+function announceStatus() {
+  if (!bc || !isPlayMode) return;
+  const running = !!(state.game && !$('game').classList.contains('hidden') && !state.game.ended);
+  bc.postMessage({ t: 'status', running, title: state.data?.title || '' });
+}
+
+// Game tab: apply settings pushed from the control panel without restarting.
+function applyLiveSettings(s = {}) {
+  const g = state.game;
+  if (!g) return;
+  if (s.mode) {
+    g.data.settings.mode = s.mode;
+    $('mode').value = s.mode;
+  }
+  if (typeof s.strictness === 'number') {
+    g.data.settings.strictness = s.strictness;
+    $('strictness').value = s.strictness;
+  }
+  if (typeof s.autoRead === 'boolean') {
+    state.autoRead = s.autoRead;
+    $('auto-read').checked = s.autoRead;
+  }
+  if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural && state.neuralAvailable && !state.neuralBroken;
+
+  const langChanged = s.langCode && s.langCode !== g.data.langCode;
+  if (s.langCode) {
+    g.data.langCode = s.langCode;
+    const ls = $('language');
+    if ([...ls.options].some((o) => o.value === s.langCode)) ls.value = s.langCode;
+  }
+  populateVoices(g.data.langCode);
+  if (s.voiceName) {
+    const vsel = $('voice');
+    if ([...vsel.options].some((o) => o.value === s.voiceName)) {
+      vsel.value = s.voiceName;
+      state.voicePicked = true;
+      state.voiceName = vsel.selectedOptions[0]?.dataset.type === 'browser' ? s.voiceName : null;
+    }
+  }
+
+  // Recognizer follows the judging mode + language.
+  const wantVoice = g.data.settings.mode.startsWith('voice') && recognitionSupported();
+  if (!wantVoice) {
+    stopTalk();
+    state.recognizer = null;
+  } else if (!state.recognizer || langChanged) {
+    stopTalk();
+    state.recognizer = makeRecognizer(g.data.langCode);
+  }
+
+  // Settings take effect internally and on the next clue (no forced re-read; the
+  // teacher can press 🔊 to re-hear the current clue in a new voice/language).
+  pushRemoteState();
+  toast('Settings applied');
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 1600);
 }
 
 // ---------- Phone remote (companion controller over the local relay) ----------
@@ -705,6 +829,9 @@ function handleRemoteCommand(action) {
 // Push current game context to any connected phones.
 function pushRemoteState() {
   if (!state.link) return;
+  // Once the game runs in another tab, that tab is the authoritative host — don't
+  // overwrite its state from the control panel.
+  if (!isPlayMode && (state.launchedPlay || state.gameRunning)) return;
   const g = state.game;
   const inGame = g && !$('game').classList.contains('hidden');
   if (!inGame) {
@@ -733,6 +860,16 @@ function pushRemoteState() {
 
 // ---------- Game screen ----------
 
+// Build a speech recognizer wired to the game's handlers, for a given language.
+function makeRecognizer(lang) {
+  if (!recognitionSupported()) return null;
+  const r = new Recognizer({ lang, maxAlternatives: 5 });
+  r.onInterim = (t) => ($('heard').textContent = t ? `… ${t}` : '');
+  r.onHypotheses = onHypotheses;
+  r.onStateChange = (on) => $('mic').classList.toggle('live', on);
+  return r;
+}
+
 function startGame(players) {
   const data = state.data;
   data.settings.mode = $('mode').value;
@@ -755,12 +892,7 @@ function startGame(players) {
   $('setup').classList.add('hidden');
   $('game').classList.remove('hidden');
 
-  if (data.settings.mode.startsWith('voice') && recognitionSupported()) {
-    state.recognizer = new Recognizer({ lang: data.langCode, maxAlternatives: 5 });
-    state.recognizer.onInterim = (t) => ($('heard').textContent = t ? `… ${t}` : '');
-    state.recognizer.onHypotheses = onHypotheses;
-    state.recognizer.onStateChange = (on) => $('mic').classList.toggle('live', on);
-  }
+  if (data.settings.mode.startsWith('voice')) state.recognizer = makeRecognizer(data.langCode);
 
   game.addEventListener('update', render);
   game.addEventListener('reveal', renderReveal);
@@ -774,6 +906,7 @@ function startGame(players) {
   // Flash the controls so the teacher sees them, then auto-hide out of the picture.
   state.autohide?.show();
   state.autohide?.scheduleHide(3000);
+  announceStatus();
 }
 
 const CORNERS = ['tl', 'tr', 'bl', 'br', 'ml', 'mr'];
@@ -1046,6 +1179,7 @@ function showResults() {
   $('result-body').innerHTML = rows;
   overlay.classList.remove('hidden');
   $('result-again').onclick = endToSetup;
+  announceStatus(); // game.ended -> tell the control panel the round is over
 }
 
 function endToSetup() {
@@ -1057,7 +1191,59 @@ function endToSetup() {
   $('result').classList.add('hidden');
   $('game').classList.add('hidden');
   $('setup').classList.remove('hidden');
+  announceStatus(); // game hidden -> control panel hides the "apply live" button
   pushRemoteState();
+}
+
+// Read a handed-off round from the setup tab and start playing immediately.
+function bootPlay() {
+  let payload = null;
+  try {
+    payload = JSON.parse(localStorage.getItem(PLAY_KEY));
+  } catch {
+    /* nothing handed off */
+  }
+  if (!payload || !payload.data) return; // opened ?play with nothing to play — stay on setup
+  state.data = payload.data;
+  const s = payload.settings || {};
+  state.autoRead = !!s.autoRead;
+  $('auto-read').checked = state.autoRead;
+  if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural;
+  if (s.voiceName) {
+    state.voiceName = s.voiceName;
+    state.voicePicked = true;
+  }
+  const ls = $('language');
+  if (s.langCode && [...ls.options].some((o) => o.value === s.langCode)) {
+    ls.value = s.langCode;
+    $('letters').value = ls.selectedOptions[0].dataset.letters;
+    populateVoices(s.langCode);
+  }
+  if (s.mode) $('mode').value = s.mode;
+  if (typeof s.strictness === 'number') {
+    $('strictness').value = s.strictness;
+    if ($('strictness-out')) $('strictness-out').textContent = s.strictness;
+  }
+  const players = payload.players?.length ? payload.players : state.players;
+  state.players = players;
+  startGame(players);
+}
+
+// Cross-tab wiring: setup tab pushes settings; game tab reports status + applies.
+if (bc) {
+  bc.onmessage = (ev) => {
+    const m = ev.data || {};
+    if (isPlayMode) {
+      if (m.t === 'apply') applyLiveSettings(m.settings);
+      else if (m.t === 'ping') announceStatus();
+    } else {
+      if (m.t === 'status') {
+        state.gameRunning = m.running;
+        if (!m.running) state.launchedPlay = false;
+        updateLiveControls();
+      }
+    }
+  };
 }
 
 // ---------- boot ----------
@@ -1067,3 +1253,11 @@ bindEditor();
 initRemoteLink();
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
 $('auto-read')?.addEventListener('change', (e) => (state.autoRead = e.target.checked));
+$('apply-live')?.addEventListener('click', applyToLiveGame);
+
+if (isPlayMode) {
+  document.body.classList.add('play-mode');
+  bootPlay();
+} else if (bc) {
+  bc.postMessage({ t: 'ping' }); // if a game tab is already open, it'll reveal the apply button
+}
