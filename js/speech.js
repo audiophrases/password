@@ -75,14 +75,45 @@ export class Recognizer {
 let voices = [];
 const listeners = new Set();
 
+// Edge exposes its high-quality online "Natural" voices a moment after page
+// load. Until they arrive, getVoices() lists only robotic local voices, so the
+// first spoken clue of a session would come out in the wrong voice. We defer
+// the first utterance until the list has "settled": a natural voice appeared,
+// or we gave up waiting (some browsers only ever expose local voices).
+let voicesSettled = false;
+let settleTimer = null;
+const readyWaiters = new Set();
+
+function haveNaturalVoice() {
+  return voices.some((v) => /natural|online/i.test(v.name || ''));
+}
+
+function markVoicesSettled() {
+  if (voicesSettled) return;
+  voicesSettled = true;
+  clearTimeout(settleTimer);
+  readyWaiters.forEach((cb) => cb());
+  readyWaiters.clear();
+}
+
+// Run cb once the natural voices have loaded — or immediately if they already
+// have (or we've stopped waiting).
+function whenVoicesReady(cb) {
+  if (voicesSettled || !window.speechSynthesis) cb();
+  else readyWaiters.add(cb);
+}
+
 function refresh() {
   voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
   listeners.forEach((cb) => cb(voices));
+  if (haveNaturalVoice()) markVoicesSettled();
 }
 if (window.speechSynthesis) {
   refresh();
   // Edge loads its online "Natural" voices a moment after page load.
   window.speechSynthesis.onvoiceschanged = refresh;
+  // Never wait forever: fall back to whatever voices exist after a short grace.
+  settleTimer = setTimeout(markVoicesSettled, 2500);
 }
 
 // Notify whenever the voice list changes (fires immediately if already loaded).
@@ -115,10 +146,20 @@ export function bestVoice(langCode) {
 }
 
 let keepAlive = null;
+let speakToken = 0;
 
 export function speak(text, langCode = 'en-US', voiceName = null) {
   if (!window.speechSynthesis || !text) return;
   stopSpeaking();
+  const token = ++speakToken;
+  // Hold the utterance until Edge's natural voices have loaded — otherwise the
+  // first spoken clue of a session comes out in the robotic default voice.
+  whenVoicesReady(() => {
+    if (token === speakToken) utter(text, langCode, voiceName);
+  });
+}
+
+function utter(text, langCode, voiceName) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = langCode;
   const two = langCode.slice(0, 2).toLowerCase();
@@ -142,6 +183,7 @@ export function speak(text, langCode = 'en-US', voiceName = null) {
 }
 
 export function stopSpeaking() {
+  speakToken++; // cancel any utterance still waiting on the voice list
   clearInterval(keepAlive);
   if (window.speechSynthesis) window.speechSynthesis.cancel();
 }
