@@ -804,6 +804,13 @@ function renderQR() {
 function handleRemoteCommand(action) {
   const g = state.game;
   const inGame = g && !$('game').classList.contains('hidden');
+  // Confirm arrival on screen (and in the console) — if this never shows when you
+  // press a phone button, the command isn't reaching the game (network/pairing),
+  // not the button handling.
+  if (action !== 'talk-start' && action !== 'talk-stop') {
+    console.log('[remote] received:', action, '· inGame:', !!inGame);
+    if (inGame) toast('📱 ' + action);
+  }
   switch (action) {
     case 'correct': if (inGame) g.correct(); break;
     case 'wrong': if (inGame) g.wrong(); break;

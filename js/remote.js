@@ -7,15 +7,20 @@ const $ = (id) => document.getElementById(id);
 const link = connect({
   role: 'remote',
   onState: applyState,
-  onStatus: (s) => {
-    const online = s === 'open';
-    document.body.classList.toggle('offline', !online);
-    $('status').textContent = online ? 'Connected' : 'Offline';
-  },
+  onStatus: (s) => setOnline(s === 'open'),
 });
 
+// Enable/disable the controls with the connection. Receiving any state below
+// also flips this on — if data is arriving the socket is open, so the buttons
+// must work, even if a transient error briefly flagged us offline.
+function setOnline(online) {
+  document.body.classList.toggle('offline', !online);
+  $('status').textContent = online ? 'Connected' : 'Offline';
+}
+
 function send(action) {
-  link.send({ t: 'cmd', action });
+  const sent = link.send({ t: 'cmd', action });
+  if (!sent) setOnline(false); // socket wasn't open — reflect it so the teacher sees why
 }
 
 document.querySelectorAll('[data-act]').forEach((b) =>
@@ -46,6 +51,7 @@ function fmt(t) {
 }
 
 function applyState(m) {
+  setOnline(true); // state arrived → the socket is open → keep the controls live
   if (m.screen === 'setup') {
     $('r-player').textContent = 'Setup';
     $('r-player').style.color = '';

@@ -277,7 +277,9 @@ const server = http.createServer((req, res) => {
       res.end('404 Not Found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': mime(file) });
+    // no-cache so a phone/laptop always revalidates and never runs stale JS/CSS
+    // after an update (a frequent source of "the remote suddenly stopped working").
+    res.writeHead(200, { 'Content-Type': mime(file), 'Cache-Control': 'no-cache' });
     res.end(data);
   });
 });

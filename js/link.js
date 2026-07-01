@@ -54,7 +54,12 @@ export function connect({ role, room = 'main', onCmd, onState, onPeers, onStatus
 
   return {
     send: (obj) => {
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(obj));
+        return true;
+      }
+      console.warn('[link] not open — dropped', obj); // command lost; caller may be "offline"
+      return false;
     },
     close: () => {
       closed = true;
