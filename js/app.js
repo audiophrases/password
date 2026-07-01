@@ -1275,14 +1275,18 @@ if (bc) {
 setupScreen();
 bindGameControls();
 bindEditor();
-initRemoteLink();
+const remoteReady = initRemoteLink(); // resolves once we know whether the neural server is up
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
 $('auto-read')?.addEventListener('change', (e) => (state.autoRead = e.target.checked));
 $('apply-live')?.addEventListener('click', applyToLiveGame);
 
 if (isPlayMode) {
   document.body.classList.add('play-mode');
-  bootPlay();
+  // Hold the first clue until the neural probe finishes, otherwise clue #1 is
+  // narrated with the browser fallback (robotic) before neural is known available
+  // — and only clue #2 onward would get the neural voice. Cap the wait so a
+  // slow or absent server can't stall the game start.
+  Promise.race([remoteReady.catch(() => {}), new Promise((r) => setTimeout(r, 1500))]).finally(bootPlay);
 } else if (bc) {
   bc.postMessage({ t: 'ping' }); // if a game tab is already open, it'll reveal the apply button
 }
