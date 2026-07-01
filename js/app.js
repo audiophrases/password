@@ -928,9 +928,9 @@ function startGame(players) {
   game.start();
   render();
 
-  // Flash the controls so the teacher sees them, then auto-hide out of the picture.
-  state.autohide?.show();
-  state.autohide?.scheduleHide(3000);
+  // Start with the control bar hidden so it stays out of the projected picture;
+  // dropping the mouse to the bottom edge summons it.
+  state.autohide?.hide();
   announceStatus();
 }
 
@@ -1152,7 +1152,7 @@ function setupControlsAutohide() {
   const hide = () => {
     if (!forceVisible()) game.classList.add('controls-hidden');
   };
-  const scheduleHide = (delay = 1500) => {
+  const scheduleHide = (delay = 300) => {
     clearTimeout(hideTimer);
     hideTimer = setTimeout(hide, delay);
   };
@@ -1176,7 +1176,7 @@ function setupControlsAutohide() {
   $('type-answer').addEventListener('focus', show);
   $('type-answer').addEventListener('blur', () => scheduleHide());
 
-  return { show, scheduleHide };
+  return { show, hide, scheduleHide };
 }
 
 async function toggleCamera() {
