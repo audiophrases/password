@@ -342,18 +342,22 @@ function parseFrames(conn) {
 }
 
 const conns = new Set();
-const rooms = new Map(); // id -> { host: conn|null, remotes: Set }
+const rooms = new Map(); // id -> { hosts: Set, remotes: Set }
 
+// A room can legitimately hold more than one host now: the setup tab (control
+// panel) and the game tab both connect as hosts. Commands are broadcast to every
+// host — the game tab acts on them; the idle control panel ignores them — so the
+// remote never breaks depending on which tab (re)connected last.
 const getRoom = (id) => {
-  if (!rooms.has(id)) rooms.set(id, { host: null, remotes: new Set() });
+  if (!rooms.has(id)) rooms.set(id, { hosts: new Set(), remotes: new Set() });
   return rooms.get(id);
 };
 
 function notifyPeers(room) {
   const r = rooms.get(room);
   if (!r) return;
-  const msg = JSON.stringify({ t: 'peers', host: !!r.host, remotes: r.remotes.size });
-  if (r.host) r.host.send(msg);
+  const msg = JSON.stringify({ t: 'peers', host: r.hosts.size > 0, remotes: r.remotes.size });
+  r.hosts.forEach((c) => c.send(msg));
   r.remotes.forEach((c) => c.send(msg));
 }
 
@@ -368,12 +372,12 @@ function handleMessage(conn, raw) {
     conn.role = msg.role === 'host' ? 'host' : 'remote';
     conn.room = msg.room || 'main';
     const r = getRoom(conn.room);
-    if (conn.role === 'host') r.host = conn;
+    if (conn.role === 'host') r.hosts.add(conn);
     else r.remotes.add(conn);
     notifyPeers(conn.room);
   } else if (msg.t === 'cmd' && conn.role === 'remote') {
     const r = rooms.get(conn.room);
-    if (r && r.host) r.host.send(JSON.stringify({ t: 'cmd', action: msg.action }));
+    if (r) r.hosts.forEach((h) => h.send(JSON.stringify({ t: 'cmd', action: msg.action })));
   } else if (msg.t === 'state' && conn.role === 'host') {
     const r = rooms.get(conn.room);
     if (r) r.remotes.forEach((c) => c.send(raw));
@@ -385,10 +389,10 @@ function dropConn(conn) {
   conns.delete(conn);
   const r = conn.room && rooms.get(conn.room);
   if (r) {
-    if (r.host === conn) r.host = null;
+    r.hosts.delete(conn);
     r.remotes.delete(conn);
     notifyPeers(conn.room);
-    if (!r.host && r.remotes.size === 0) rooms.delete(conn.room);
+    if (r.hosts.size === 0 && r.remotes.size === 0) rooms.delete(conn.room);
   }
 }
 

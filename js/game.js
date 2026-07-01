@@ -23,7 +23,8 @@ export class Game extends EventTarget {
     this.running = false;
     this.paused = false;
     this._timer = null;
-    this.revealMs = 1600; // hold the correct/wrong result before switching players
+    this.revealMs = 1600; // hold a wrong answer on screen before switching players
+    this.passMs = 700; // shorter hold for a pass (yellow) before switching
     this._revealing = false;
     this._revealTimer = null;
   }
@@ -108,20 +109,14 @@ export class Game extends EventTarget {
     this.activeIndex = next;
   }
 
-  _resolve(state) {
-    const p = this.active;
-    const letter = this.currentLetter;
-    if (!letter || p.done || this._revealing) return;
-    p.results[letter] = state;
-    p.queue.shift();
-    const finishing = p.queue.length === 0;
+  // Hold the just-marked result on screen for `revealMs`, then hand the turn on.
+  // If nobody else is waiting (single player or everyone else done), advance now.
+  _handOver(p, revealMs, finishing) {
     const advance = () => {
       if (finishing) this._finishPlayer(p); // marks done, then rotates or ends
       else this._rotate();
       if (!this.ended) this.emit('update');
     };
-
-    // If another player will get the turn, hold the green/red reveal a beat first.
     const willSwitch = this.players.some((x, i) => i !== this.activeIndex && !x.done);
     if (!willSwitch) {
       advance();
@@ -133,26 +128,40 @@ export class Game extends EventTarget {
     this._revealTimer = setTimeout(() => {
       this._revealing = false;
       advance();
-    }, this.revealMs);
+    }, revealMs);
   }
 
+  // Correct: keep the turn. As long as the player keeps answering correctly it
+  // stays their go; only a wrong answer or a pass hands the turn on.
   correct() {
-    this._resolve('correct');
+    const p = this.active;
+    const letter = this.currentLetter;
+    if (!letter || p.done || this._revealing) return;
+    p.results[letter] = 'correct';
+    p.queue.shift();
+    if (p.queue.length === 0) this._finishPlayer(p); // cleared the whole board this turn
+    if (!this.ended) this.emit('update');
   }
 
+  // Wrong: mark it and hand the turn on after the (longer) red reveal.
   wrong() {
-    this._resolve('wrong');
+    const p = this.active;
+    const letter = this.currentLetter;
+    if (!letter || p.done || this._revealing) return;
+    p.results[letter] = 'wrong';
+    p.queue.shift();
+    this._handOver(p, this.revealMs, p.queue.length === 0);
   }
 
-  // pass: requeue this letter at the back, no penalty, pass the turn.
+  // Pass: requeue this letter at the back (no penalty) and hand the turn on after
+  // a shorter yellow reveal.
   pass() {
     const p = this.active;
     const letter = this.currentLetter;
     if (!letter || p.done || this._revealing) return;
     if (p.results[letter] === 'pending') p.results[letter] = 'passed';
     p.queue.push(p.queue.shift());
-    this._rotate();
-    if (!this.ended) this.emit('update');
+    this._handOver(p, this.passMs, false);
   }
 
   emit(type) {
