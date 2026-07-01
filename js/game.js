@@ -67,6 +67,19 @@ export class Game extends EventTarget {
     this.emit('update');
   }
 
+  // Change the per-player time bank on a running game. Shift each active clock by
+  // the delta so a player who has already spent time keeps that elapsed amount
+  // (e.g. 150 left of 200 → 250 left of 300). Done players are left as they are.
+  setDuration(sec) {
+    sec = Math.max(1, Math.floor(sec));
+    const delta = sec - this.duration;
+    this.duration = sec;
+    if (!delta) return;
+    this.players.forEach((p) => {
+      if (!p.done) p.timeLeft = Math.max(0, p.timeLeft + delta);
+    });
+  }
+
   _tick() {
     clearInterval(this._timer);
     this._timer = setInterval(() => {

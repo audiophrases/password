@@ -285,6 +285,7 @@ function loadGameText(text, players) {
   // sync UI defaults from the loaded game
   $('mode').value = result.game.settings.mode;
   $('strictness').value = result.game.settings.strictness;
+  $('duration').value = result.game.settings.durationSec || 200;
   // sync the language selector + voice picker to the loaded game's language
   const langSel = $('language');
   if ([...langSel.options].some((o) => o.value === result.game.langCode)) {
@@ -626,10 +627,12 @@ function currentSettings() {
   return {
     mode: $('mode').value,
     strictness: parseFloat($('strictness').value),
+    durationSec: +$('duration').value || state.data?.settings?.durationSec || 200,
     langCode: $('language').value,
     voiceName: state.voiceName,
     useNeural: state.useNeural,
     autoRead: state.autoRead,
+    players: state.players.map((p) => ({ name: p.name, color: p.color })),
   };
 }
 
@@ -646,6 +649,7 @@ function beginGame() {
   const s = currentSettings();
   data.settings.mode = s.mode;
   data.settings.strictness = s.strictness;
+  data.settings.durationSec = s.durationSec;
   data.langCode = s.langCode;
   const payload = { data, players: state.players.map((p) => ({ name: p.name, color: p.color })), settings: s };
   try {
@@ -696,6 +700,20 @@ function applyLiveSettings(s = {}) {
     $('auto-read').checked = s.autoRead;
   }
   if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural && state.neuralAvailable && !state.neuralBroken;
+
+  // Time bank: adjust each running clock by the change so elapsed time is kept.
+  if (typeof s.durationSec === 'number' && s.durationSec > 0) g.setDuration(s.durationSec);
+
+  // Player names: update the engine, the on-board circle labels, and the HUD.
+  if (Array.isArray(s.players)) {
+    s.players.forEach((pl, i) => {
+      if (g.players[i] && pl && pl.name) {
+        g.players[i].name = pl.name;
+        state.circles[i]?.setName(pl.name);
+      }
+    });
+  }
+  if (state.circles?.length) renderHud(); // reflect new names/times without re-reading the clue
 
   const langChanged = s.langCode && s.langCode !== g.data.langCode;
   if (s.langCode) {
