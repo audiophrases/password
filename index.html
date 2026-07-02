@@ -18,7 +18,8 @@
     <div class="setup-grid">
       <!-- 1. Generate words via any chatbot -->
       <div class="card">
-        <h2>1 · Generate the words</h2>
+        <h2>1 · Draft words with AI</h2>
+        <p class="hint card-note">Builds a prompt to paste into ChatGPT / Claude / any chatbot. These fields only shape that prompt — they don't change a game you've already loaded. Players &amp; seconds here just seed the prompt; a loaded game keeps its own.</p>
         <div class="field-row">
           <label>Language
             <select id="language">
@@ -41,17 +42,6 @@
           <label>Letters <input id="letters" type="text" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" /></label>
           <label>Seconds <input id="duration" type="number" value="200" min="30" max="600" /></label>
         </div>
-        <label>Voice (read-aloud)
-          <span class="voice-pick">
-            <select id="voice"></select>
-            <button id="test-voice" class="btn ghost small" type="button" title="Test voice">▶</button>
-          </span>
-        </label>
-        <label class="check"><input id="neural" type="checkbox" disabled /> High-quality neural voice (uses the server)</label>
-        <div id="neural-note" class="hint"></div>
-        <label class="slider">Reading speed <input id="tts-rate" type="range" min="0.5" max="1.5" step="0.01" value="1" />
-          <input id="tts-rate-num" class="num" type="number" min="0.5" max="1.5" step="0.01" value="1.00" title="Type an exact speed, e.g. 0.89" />
-        </label>
         <button id="build-prompt" class="btn">Build chatbot prompt</button>
         <textarea id="prompt-output" class="mono" rows="5" placeholder="Your prompt appears here — paste it into ChatGPT / Claude / any chatbot."></textarea>
         <button id="copy-prompt" class="btn ghost">Copy prompt</button>
@@ -60,6 +50,7 @@
       <!-- 2. Your games (saved in this browser) -->
       <div class="card">
         <h2>2 · Your games</h2>
+        <p class="hint card-note">A game's words, language, letters and time are part of the game itself — press ✏️ to edit them. Paste chatbot JSON under “Import”.</p>
         <div id="library" class="library"></div>
         <div class="field-row">
           <button id="edit-game" class="btn">✏️ New game</button>
@@ -78,12 +69,15 @@
         </details>
       </div>
 
-      <!-- 3. Players & rules -->
+      <!-- 3. Settings for playing the loaded game -->
       <div class="card">
-        <h2>3 · Players &amp; rules</h2>
-        <p class="hint">Set the number of players in section 1; name them here.</p>
+        <h2>3 · Play settings</h2>
+        <p class="hint card-note">How the loaded game is judged and read aloud. Set these before you start — or push them to a running game with ⚡ Apply, no restart needed.</p>
+
+        <div class="group-label">Players <span class="hint">count comes from section 1 or the loaded game</span></div>
         <div id="players-list"></div>
-        <hr />
+
+        <div class="group-label">Judging</div>
         <label>Judging mode
           <select id="mode">
             <option value="voice-assist">Voice-assist (ASR suggests, you confirm)</option>
@@ -95,8 +89,23 @@
         <label class="slider">Strictness <input id="strictness" type="range" min="0" max="1" step="0.05" value="0.7" />
           <output id="strictness-out">0.7</output>
         </label>
+
+        <div class="group-label">Read-aloud <span class="hint">voice follows the game's language</span></div>
+        <label>Voice
+          <span class="voice-pick">
+            <select id="voice"></select>
+            <button id="test-voice" class="btn ghost small" type="button" title="Test voice">▶</button>
+          </span>
+        </label>
+        <label class="check"><input id="neural" type="checkbox" disabled /> High-quality neural voice (uses the server)</label>
+        <div id="neural-note" class="hint"></div>
+        <label class="slider">Reading speed <input id="tts-rate" type="range" min="0.5" max="1.5" step="0.01" value="1" />
+          <input id="tts-rate-num" class="num" type="number" min="0.5" max="1.5" step="0.01" value="1.00" title="Type an exact speed, e.g. 0.89" />
+        </label>
         <label class="check"><input id="auto-read" type="checkbox" /> Read clues aloud automatically</label>
         <p id="speech-note" class="hint"></p>
+
+        <hr />
         <div id="remote-info" class="hint remote-info"></div>
         <div id="remote-qr" class="remote-qr"></div>
         <button id="start-game" class="btn primary" disabled>▶ Start game (new tab)</button>
