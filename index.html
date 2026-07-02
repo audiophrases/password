@@ -19,7 +19,7 @@
       <!-- 1. Generate words via any chatbot -->
       <div class="card">
         <h2>1 · Draft words with AI</h2>
-        <p class="hint card-note">Builds a prompt to paste into ChatGPT / Claude / any chatbot. These fields only shape that prompt — they don't change a game you've already loaded. Players &amp; seconds here just seed the prompt; a loaded game keeps its own.</p>
+        <p class="hint card-note">Builds a prompt to paste into ChatGPT / Claude / any chatbot. These fields only shape that prompt — they don't change a game you've already loaded.</p>
         <div class="field-row">
           <label>Language
             <select id="prompt-lang">
@@ -38,10 +38,7 @@
           <label>Players <input id="num-players" type="number" value="1" min="1" max="6" /></label>
         </div>
         <label>Topic / theme <input id="topic" type="text" value="everyday vocabulary" /></label>
-        <div class="field-row">
-          <label>Letters <input id="letters" type="text" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" /></label>
-          <label>Seconds <input id="duration" type="number" value="200" min="30" max="600" /></label>
-        </div>
+        <label>Letters <input id="letters" type="text" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" /></label>
         <button id="build-prompt" class="btn">Build chatbot prompt</button>
         <textarea id="prompt-output" class="mono" rows="5" placeholder="Your prompt appears here — paste it into ChatGPT / Claude / any chatbot."></textarea>
         <button id="copy-prompt" class="btn ghost">Copy prompt</button>
@@ -99,6 +96,9 @@
         <label class="slider">Strictness <input id="strictness" type="range" min="0" max="1" step="0.05" value="0.7" />
           <output id="strictness-out">0.7</output>
         </label>
+        <label>Time limit (seconds per player, 0 = no timer)
+          <input id="play-duration" type="number" value="300" min="0" max="3600" step="10" />
+        </label>
 
         <div class="group-label">Read-aloud <span class="hint">voice follows the game's language</span></div>
         <label>Voice
@@ -109,8 +109,8 @@
         </label>
         <label class="check"><input id="neural" type="checkbox" disabled /> High-quality neural voice (uses the server)</label>
         <div id="neural-note" class="hint"></div>
-        <label class="slider">Reading speed <input id="tts-rate" type="range" min="0.5" max="1.5" step="0.01" value="1" />
-          <input id="tts-rate-num" class="num" type="number" min="0.5" max="1.5" step="0.01" value="1.00" title="Type an exact speed, e.g. 0.89" />
+        <label class="slider">Reading speed <input id="tts-rate" type="range" min="0.5" max="1.5" step="0.01" value="0.93" />
+          <input id="tts-rate-num" class="num" type="number" min="0.5" max="1.5" step="0.01" value="0.93" title="Type an exact speed, e.g. 0.89" />
         </label>
         <label class="check"><input id="auto-read" type="checkbox" checked /> Read clues aloud automatically</label>
         <p id="speech-note" class="hint"></p>
@@ -137,7 +137,7 @@
         <option value="fr-FR" data-name="French">French</option>
         <option value="es-ES" data-name="Spanish">Spanish</option>
       </select>
-      <label class="editor-time" title="Time bank per player">⏱ <input id="editor-duration" type="number" value="200" min="30" max="600" /> s</label>
+      <label class="editor-time" title="Time bank per player (0 = no timer)">⏱ <input id="editor-duration" type="number" value="300" min="0" max="3600" step="10" /> s</label>
       <div class="editor-actions">
         <button id="editor-scaffold" class="btn ghost small">+ Letters A–Z</button>
         <button id="editor-add" class="btn ghost small">+ Row</button>

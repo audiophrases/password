@@ -30,6 +30,31 @@
 
   <button data-act="read" class="clue">🔊 Clue</button>
 
+  <details id="r-settings" class="rset">
+    <summary>⚙ Game settings</summary>
+    <label>Judging
+      <select id="rs-mode">
+        <option value="voice-assist">Voice-assist</option>
+        <option value="voice-auto">Voice-auto</option>
+        <option value="teacher-judge">Teacher-judge</option>
+        <option value="type-in">Type-in</option>
+      </select>
+    </label>
+    <label class="rslider">Strictness
+      <input id="rs-strict" type="range" min="0" max="1" step="0.05" value="0.7" />
+      <output id="rs-strict-out">0.7</output>
+    </label>
+    <label class="rslider">Speed
+      <input id="rs-rate" type="range" min="0.5" max="1.5" step="0.01" value="0.93" />
+      <output id="rs-rate-out">0.93</output>
+    </label>
+    <label class="rslider">Time (s, 0 = ∞)
+      <input id="rs-duration" type="number" min="0" max="3600" step="10" value="300" />
+    </label>
+    <label class="rcheck"><input id="rs-autoread" type="checkbox" checked /> Read clues aloud automatically</label>
+    <button id="rs-apply">⚡ Apply to game</button>
+  </details>
+
   <div class="row2">
     <button data-act="start">▶ Start</button>
     <button id="talk">🎤 Hold to talk</button>

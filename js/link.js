@@ -26,7 +26,7 @@ export function connect({ role, room = 'main', onCmd, onState, onPeers, onStatus
       } catch {
         return;
       }
-      if (m.t === 'cmd') onCmd?.(m.action);
+      if (m.t === 'cmd') onCmd?.(m.action, m); // pass the whole msg for payload commands
       else if (m.t === 'state') onState?.(m);
       else if (m.t === 'peers') onPeers?.(m);
     };

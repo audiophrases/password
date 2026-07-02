@@ -36,7 +36,7 @@ const state = {
   camera: new Camera(),
   cameraOn: false,
   autoRead: true, // read clues aloud by default (checkbox in Play settings)
-  ttsRate: 1, // read-aloud speed multiplier (1 = normal); fine-tuned in Settings
+  ttsRate: 0.93, // read-aloud speed multiplier (1 = normal); slightly slow suits ESL
   voiceName: null,
   voicePicked: false,
   neuralAvailable: false,
@@ -236,9 +236,19 @@ function setupScreen() {
   });
   // Slider drags update everything live; the number box lets you type an exact
   // value (e.g. 0.89) and commits on blur/Enter.
-  $('tts-rate').addEventListener('input', (e) => setTtsRate(parseFloat(e.target.value) || 1));
-  $('tts-rate-num').addEventListener('change', (e) => setTtsRate(parseFloat(e.target.value) || 1));
-  setTtsRate(parseFloat($('tts-rate').value) || 1); // sync state + boxes from the initial value
+  $('tts-rate').addEventListener('input', (e) => setTtsRate(parseFloat(e.target.value) || 0.93));
+  $('tts-rate-num').addEventListener('change', (e) => setTtsRate(parseFloat(e.target.value) || 0.93));
+  setTtsRate(parseFloat($('tts-rate').value) || 0.93); // sync state + boxes from the initial value
+
+  // Time limit belongs to the loaded game; edits here write it back (0 = no timer).
+  $('play-duration').addEventListener('change', () => {
+    const v = playDurationValue();
+    $('play-duration').value = v;
+    if (state.data) {
+      state.data.settings.durationSec = v;
+      updateCurrentGame();
+    }
+  });
   populateVoices($('language').value);
   onVoices(() => populateVoices($('language').value)); // re-list once Edge's natural voices load
 
@@ -251,7 +261,6 @@ function setupScreen() {
       topic: $('topic').value.trim() || 'everyday vocabulary',
       letters: letters.length ? letters : ALPHABET_EN,
       langCode: opt.value,
-      durationSec: +$('duration').value || 200,
       players: state.players.length,
     });
     $('prompt-output').value = prompt;
@@ -304,9 +313,10 @@ function updateCurrentGame() {
   const langName =
     [...$('language').options].find((o) => o.value === g.langCode)?.dataset.name || g.language || g.langCode;
   box.className = 'current-game';
+  const time = g.settings.durationSec > 0 ? `${g.settings.durationSec}s each` : 'no timer';
   box.innerHTML =
     `<b>${esc(g.title)}</b>` +
-    `<span>${esc(langName)} · ${g.letters.length} letters · ${g.players} player${g.players > 1 ? 's' : ''} · ${g.settings.durationSec}s each</span>`;
+    `<span>${esc(langName)} · ${g.letters.length} letters · ${g.players} player${g.players > 1 ? 's' : ''} · ${time}</span>`;
 }
 
 function loadGameText(text, players) {
@@ -325,6 +335,7 @@ function loadGameText(text, players) {
   // section-1 prompt fields (language/letters/seconds), which stay independent.
   $('mode').value = result.game.settings.mode;
   $('strictness').value = result.game.settings.strictness;
+  $('play-duration').value = result.game.settings.durationSec;
   const langSel = $('language'); // section-3 game language
   if ([...langSel.options].some((o) => o.value === result.game.langCode)) {
     langSel.value = result.game.langCode;
@@ -430,7 +441,7 @@ function removeSet() {
 function openEditor(blank) {
   const data = blank === true ? null : state.data;
   $('editor-title').value = data?.title || '';
-  $('editor-duration').value = data?.settings?.durationSec || 200;
+  $('editor-duration').value = data?.settings?.durationSec ?? 300; // ?? keeps an explicit 0 (no timer)
   const lang = $('editor-lang');
   const known = [...lang.options].map((o) => o.value);
   lang.value = data && known.includes(data.langCode) ? data.langCode : $('language').value;
@@ -518,7 +529,14 @@ function saveEditorData() {
     language: opt.dataset.name,
     langCode: opt.value,
     players: state.edit.sets, // one word set per player
-    settings: { durationSec: +$('editor-duration').value || 200, mode: $('mode').value, strictness: parseFloat($('strictness').value) },
+    settings: {
+      durationSec: (() => {
+        const v = Math.floor(+$('editor-duration').value);
+        return Number.isFinite(v) && v >= 0 ? v : 300; // 0 = no timer
+      })(),
+      mode: $('mode').value,
+      strictness: parseFloat($('strictness').value),
+    },
     letters,
   };
   const result = validateGame(game);
@@ -661,12 +679,18 @@ function flash(btn, text) {
   setTimeout(() => (btn.textContent = old), 1200);
 }
 
+// Clamped time-limit field value; 0 means no timer.
+function playDurationValue() {
+  const v = Math.floor(+$('play-duration').value);
+  return Number.isFinite(v) && v >= 0 ? Math.min(3600, v) : 300;
+}
+
 // Snapshot the settings that can be pushed to (or launched into) a live game.
 function currentSettings() {
   return {
     mode: $('mode').value,
     strictness: parseFloat($('strictness').value),
-    durationSec: +$('duration').value || state.data?.settings?.durationSec || 200,
+    durationSec: playDurationValue(),
     langCode: $('language').value,
     voiceName: state.voiceName,
     useNeural: state.useNeural,
@@ -743,7 +767,12 @@ function applyLiveSettings(s = {}) {
   if (typeof s.ttsRate === 'number') setTtsRate(s.ttsRate);
 
   // Time bank: adjust each running clock by the change so elapsed time is kept.
-  if (typeof s.durationSec === 'number' && s.durationSec > 0) g.setDuration(s.durationSec);
+  // 0 switches the timer off mid-game (∞); a positive value switches it back on.
+  if (typeof s.durationSec === 'number' && s.durationSec >= 0) {
+    g.setDuration(s.durationSec);
+    g.data.settings.durationSec = g.duration;
+    $('play-duration').value = g.duration;
+  }
 
   // Player names: update the engine, the on-board circle labels, and the HUD.
   if (Array.isArray(s.players)) {
@@ -860,7 +889,7 @@ function renderQR() {
 }
 
 // Map a remote button to the same actions as the keyboard/on-screen controls.
-function handleRemoteCommand(action) {
+function handleRemoteCommand(action, msg) {
   const g = state.game;
   const inGame = g && !$('game').classList.contains('hidden');
   // Confirm arrival on screen (and in the console) — if this never shows when you
@@ -868,9 +897,10 @@ function handleRemoteCommand(action) {
   // not the button handling.
   if (action !== 'talk-start' && action !== 'talk-stop') {
     console.log('[remote] received:', action, '· inGame:', !!inGame);
-    if (inGame) toast('📱 ' + action);
+    if (inGame && action !== 'apply-settings') toast('📱 ' + action); // apply shows its own toast
   }
   switch (action) {
+    case 'apply-settings': if (inGame) applyLiveSettings(msg?.settings || {}); break;
     case 'correct': if (inGame) g.correct(); break;
     case 'wrong': if (inGame) g.wrong(); break;
     case 'pass': if (inGame) g.pass(); break;
@@ -911,7 +941,7 @@ function pushRemoteState() {
     screen: 'game',
     player: p.name,
     color: p.color,
-    time: p.timeLeft,
+    time: Number.isFinite(p.timeLeft) ? p.timeLeft : -1, // -1 = no timer (Infinity isn't JSON)
     score: g.score(p),
     total: g.order.length,
     letter: e ? e.letter : '',
@@ -921,6 +951,14 @@ function pushRemoteState() {
     accept: e ? (e.accept || []).join(', ') : '',
     paused: g.paused,
     suggestion: state.lastSuggestion || '',
+    // current settings, so the phone's ⚙ panel starts from live values
+    settings: {
+      mode: g.data.settings.mode,
+      strictness: g.data.settings.strictness,
+      ttsRate: state.ttsRate,
+      autoRead: state.autoRead,
+      durationSec: g.duration,
+    },
   });
 }
 
@@ -1026,8 +1064,10 @@ function renderHud() {
   $('hud-name').textContent = p.name;
   $('hud-name').style.color = p.color;
   const t = p.timeLeft;
-  $('hud-time').textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
-  $('hud-time').classList.toggle('low', t <= 15);
+  $('hud-time').textContent = Number.isFinite(t)
+    ? `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`
+    : '∞';
+  $('hud-time').classList.toggle('low', Number.isFinite(t) && t <= 15);
   $('hud-score').textContent = `${game.score(p)}/${game.order.length}`;
   // mini circles show each player's own remaining time
   state.circles.forEach((c, i) => c.setTime(game.players[i].timeLeft));
@@ -1286,6 +1326,7 @@ function bootPlay() {
     populateVoices(s.langCode);
   }
   if (s.mode) $('mode').value = s.mode;
+  if (typeof s.durationSec === 'number') $('play-duration').value = s.durationSec;
   if (typeof s.strictness === 'number') {
     $('strictness').value = s.strictness;
     if ($('strictness-out')) $('strictness-out').textContent = s.strictness;

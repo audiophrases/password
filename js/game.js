@@ -8,6 +8,8 @@ export class Game extends EventTarget {
     this.data = data;
     this.order = data.letters.map((l) => l.letter);
     this.byLetter = new Map(data.letters.map((l) => [l.letter, l]));
+    // duration 0 (or less) = no timer: time banks are Infinity, which the tick
+    // math leaves untouched (Infinity - 1 === Infinity) and never hits 0.
     this.duration = data.settings.durationSec;
 
     this.players = players.map((p) => ({
@@ -15,7 +17,7 @@ export class Game extends EventTarget {
       color: p.color,
       results: Object.fromEntries(this.order.map((l) => [l, 'pending'])),
       queue: [...this.order],
-      timeLeft: this.duration,
+      timeLeft: this.duration > 0 ? this.duration : Infinity,
       done: false,
     }));
 
@@ -71,12 +73,15 @@ export class Game extends EventTarget {
   // the delta so a player who has already spent time keeps that elapsed amount
   // (e.g. 150 left of 200 → 250 left of 300). Done players are left as they are.
   setDuration(sec) {
-    sec = Math.max(1, Math.floor(sec));
-    const delta = sec - this.duration;
+    sec = Math.max(0, Math.floor(sec));
+    const old = this.duration;
     this.duration = sec;
-    if (!delta) return;
+    if (sec === old) return;
     this.players.forEach((p) => {
-      if (!p.done) p.timeLeft = Math.max(0, p.timeLeft + delta);
+      if (p.done) return;
+      if (sec <= 0) p.timeLeft = Infinity; // timer switched off mid-game
+      else if (!Number.isFinite(p.timeLeft) || old <= 0) p.timeLeft = sec; // timer switched on
+      else p.timeLeft = Math.max(1, p.timeLeft + (sec - old)); // keep elapsed time
     });
   }
 
@@ -182,8 +187,12 @@ export class Game extends EventTarget {
   }
 
   results() {
+    // Infinity - Infinity is NaN, so guard the time tiebreak for no-timer games.
     return this.players
       .map((p) => ({ name: p.name, color: p.color, score: this.score(p), timeLeft: p.timeLeft }))
-      .sort((a, b) => b.score - a.score || b.timeLeft - a.timeLeft);
+      .sort((a, b) => {
+        const dt = b.timeLeft - a.timeLeft;
+        return b.score - a.score || (Number.isFinite(dt) ? dt : 0);
+      });
   }
 }

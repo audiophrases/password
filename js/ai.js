@@ -9,7 +9,6 @@ export function buildPrompt({
   topic = 'everyday vocabulary',
   letters = ALPHABET_EN,
   langCode = 'en-US',
-  durationSec = 200,
   players = 1,
 }) {
   const letterList = letters.join(', ');
@@ -32,7 +31,7 @@ Return ONLY valid JSON (no markdown, no commentary) matching this exact schema:
   "title": "string — short name for this round",
   "language": "${language}",
   "langCode": "${langCode}",
-  "settings": { "durationSec": ${durationSec}, "mode": "voice-auto", "strictness": 0.7 },
+  "settings": { "mode": "voice-auto", "strictness": 0.7 },
   "players": ${n},
   "letters": [
     {
@@ -110,7 +109,11 @@ export function validateGame(obj) {
     langCode: obj.langCode || 'en-US',
     players,
     settings: {
-      durationSec: Number(obj.settings?.durationSec) || 200,
+      // default 300s; an explicit 0 is kept and means "no timer"
+      durationSec: (() => {
+        const d = Number(obj.settings?.durationSec);
+        return Number.isFinite(d) && d >= 0 ? Math.floor(d) : 300;
+      })(),
       mode: obj.settings?.mode || 'voice-auto',
       strictness: typeof obj.settings?.strictness === 'number' ? obj.settings.strictness : 0.7,
     },

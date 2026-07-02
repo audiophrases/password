@@ -384,7 +384,8 @@ function handleMessage(conn, raw) {
     notifyPeers(conn.room);
   } else if (msg.t === 'cmd' && conn.role === 'remote') {
     const r = rooms.get(conn.room);
-    if (r) r.hosts.forEach((h) => h.send(JSON.stringify({ t: 'cmd', action: msg.action })));
+    // forward the optional settings payload too (used by the phone's ⚙ panel)
+    if (r) r.hosts.forEach((h) => h.send(JSON.stringify({ t: 'cmd', action: msg.action, settings: msg.settings })));
   } else if (msg.t === 'state' && conn.role === 'host') {
     const r = rooms.get(conn.room);
     if (r) r.remotes.forEach((c) => c.send(raw));

@@ -49,6 +49,12 @@ export class Circle {
       this.timeEl.textContent = '';
       return;
     }
+    if (!Number.isFinite(seconds)) {
+      // no-timer game
+      this.timeEl.textContent = '∞';
+      this.timeEl.classList.remove('low');
+      return;
+    }
     this.timeEl.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
     this.timeEl.classList.toggle('low', seconds <= 15);
   }

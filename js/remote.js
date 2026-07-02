@@ -47,8 +47,49 @@ talk.addEventListener('pointercancel', stopTalk);
 
 function fmt(t) {
   if (t == null) return '';
+  if (t < 0) return '∞'; // host sends -1 for a no-timer game
   return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 }
+
+// ---- ⚙ game settings panel: mirrors live values, applies without restart ----
+const rset = $('r-settings');
+$('rs-strict').addEventListener('input', (e) => ($('rs-strict-out').textContent = e.target.value));
+$('rs-rate').addEventListener('input', (e) => ($('rs-rate-out').textContent = e.target.value));
+
+// Fill the panel from the game's live settings — but never while the teacher has
+// it open and is mid-edit.
+function fillSettings(s) {
+  if (!s || rset.open) return;
+  $('rs-mode').value = s.mode || 'voice-auto';
+  if (typeof s.strictness === 'number') {
+    $('rs-strict').value = s.strictness;
+    $('rs-strict-out').textContent = s.strictness;
+  }
+  if (typeof s.ttsRate === 'number') {
+    $('rs-rate').value = s.ttsRate;
+    $('rs-rate-out').textContent = s.ttsRate;
+  }
+  if (typeof s.durationSec === 'number') $('rs-duration').value = s.durationSec;
+  if (typeof s.autoRead === 'boolean') $('rs-autoread').checked = s.autoRead;
+}
+
+$('rs-apply').addEventListener('click', () => {
+  const sent = link.send({
+    t: 'cmd',
+    action: 'apply-settings',
+    settings: {
+      mode: $('rs-mode').value,
+      strictness: parseFloat($('rs-strict').value),
+      ttsRate: parseFloat($('rs-rate').value),
+      durationSec: Math.max(0, Math.floor(+$('rs-duration').value) || 0),
+      autoRead: $('rs-autoread').checked,
+    },
+  });
+  if (!sent) setOnline(false);
+  const btn = $('rs-apply');
+  btn.textContent = sent ? 'Applied ✓' : 'Offline ✕';
+  setTimeout(() => (btn.textContent = '⚡ Apply to game'), 1200);
+});
 
 function applyState(m) {
   setOnline(true); // state arrived → the socket is open → keep the controls live
@@ -79,4 +120,5 @@ function applyState(m) {
     : m.suggestion
     ? `speech suggests: ${m.suggestion === 'wrong' ? 'wrong' : 'correct'}`
     : '';
+  fillSettings(m.settings);
 }
