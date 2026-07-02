@@ -13,7 +13,7 @@ body {
   background: var(--bg); color: var(--ink);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   display: flex; flex-direction: column; gap: 10px; padding: 10px;
-  min-height: 100vh; user-select: none; touch-action: manipulation;
+  min-height: 100vh; -webkit-user-select: none; user-select: none; touch-action: manipulation;
 }
 button { font-family: inherit; touch-action: manipulation; }
 
@@ -74,6 +74,13 @@ body.offline .status::before { content: 'Reconnecting… '; }
 .rset summary::before { content: '▸ '; }
 .rset[open] summary::before { content: '▾ '; }
 .rset label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0; }
+.rs-label { font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+#rs-players { display: flex; flex-direction: column; gap: 6px; }
+.rs-name {
+  width: 100%; background: #fff; color: var(--ink); font-size: 15px; font-weight: 600;
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  -webkit-user-select: text; user-select: text; /* body disables selection; typing needs it */
+}
 .rset select, .rset input[type=number] {
   width: 100%; margin-top: 4px; background: #fff; color: var(--ink);
   border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 15px;

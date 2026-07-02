@@ -807,14 +807,17 @@ function applyLiveSettings(s = {}) {
     $('play-duration').value = g.duration;
   }
 
-  // Player names: update the engine, the on-board circle labels, and the HUD.
+  // Player names: update the engine, the on-board circle labels, the HUD, and
+  // the roster used for the next round. Empty names are ignored.
   if (Array.isArray(s.players)) {
     s.players.forEach((pl, i) => {
       if (g.players[i] && pl && pl.name) {
         g.players[i].name = pl.name;
+        if (state.players[i]) state.players[i].name = pl.name;
         state.circles[i]?.setName(pl.name);
       }
     });
+    renderPlayers(state.players); // keep the setup panel's name fields in sync
   }
   if (state.circles?.length) renderHud(); // reflect new names/times without re-reading the clue
 
@@ -992,6 +995,7 @@ function pushRemoteState() {
       ttsRate: state.ttsRate,
       autoRead: state.autoRead,
       durationSec: g.duration,
+      players: g.players.map((pl) => ({ name: pl.name, color: pl.color })),
     },
   });
 }

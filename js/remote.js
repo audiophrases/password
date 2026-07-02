@@ -71,6 +71,19 @@ function fillSettings(s) {
   }
   if (typeof s.durationSec === 'number') $('rs-duration').value = s.durationSec;
   if (typeof s.autoRead === 'boolean') $('rs-autoread').checked = s.autoRead;
+  // One name input per player, tinted with the player's circle colour.
+  if (Array.isArray(s.players)) {
+    const box = $('rs-players');
+    box.innerHTML = '';
+    s.players.forEach((p, i) => {
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'rs-name';
+      inp.value = p.name || `Player ${i + 1}`;
+      inp.style.borderLeft = `6px solid ${p.color || '#ccc'}`;
+      box.appendChild(inp);
+    });
+  }
 }
 
 $('rs-apply').addEventListener('click', () => {
@@ -83,6 +96,8 @@ $('rs-apply').addEventListener('click', () => {
       ttsRate: parseFloat($('rs-rate').value),
       durationSec: Math.max(0, Math.floor(+$('rs-duration').value) || 0),
       autoRead: $('rs-autoread').checked,
+      // keep index order — the host matches names to players by position
+      players: [...document.querySelectorAll('#rs-players .rs-name')].map((i) => ({ name: i.value.trim() })),
     },
   });
   if (!sent) setOnline(false);
