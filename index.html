@@ -47,7 +47,7 @@
       <!-- 2. Your games (saved in this browser) -->
       <div class="card">
         <h2>2 · Your games</h2>
-        <p class="hint card-note">A game's words, language, letters and time are part of the game itself — press ✏️ to edit them. Paste chatbot JSON under “Import”.</p>
+        <p class="hint card-note">A game is its <b>content</b>: language, letters, words &amp; clues (one word set per player). Press ✏️ to edit. Paste chatbot JSON under “Import”.</p>
         <div id="library" class="library"></div>
         <div class="field-row">
           <button id="edit-game" class="btn">✏️ New game</button>
@@ -69,7 +69,7 @@
       <!-- 3. Settings for playing the loaded game -->
       <div class="card">
         <h2>3 · Play settings</h2>
-        <p class="hint card-note">How the loaded game is judged and read aloud. Set these before you start — or push them to a running game with ⚡ Apply, no restart needed.</p>
+        <p class="hint card-note"><b>Yours, not the game's</b>: how any game is judged, timed and read aloud. Remembered on this laptop; loading a game never changes them. Push changes to a running game with ⚡ Apply.</p>
 
         <label>Game language
           <select id="language">
@@ -137,7 +137,6 @@
         <option value="fr-FR" data-name="French">French</option>
         <option value="es-ES" data-name="Spanish">Spanish</option>
       </select>
-      <label class="editor-time" title="Time bank per player (0 = no timer)">⏱ <input id="editor-duration" type="number" value="300" min="0" max="3600" step="10" /> s</label>
       <div class="editor-actions">
         <button id="editor-scaffold" class="btn ghost small">+ Letters A–Z</button>
         <button id="editor-add" class="btn ghost small">+ Row</button>

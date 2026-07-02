@@ -236,19 +236,21 @@ function setupScreen() {
   });
   // Slider drags update everything live; the number box lets you type an exact
   // value (e.g. 0.89) and commits on blur/Enter.
+  $('tts-rate').addEventListener('change', savePrefs);
   $('tts-rate').addEventListener('input', (e) => setTtsRate(parseFloat(e.target.value) || 0.93));
-  $('tts-rate-num').addEventListener('change', (e) => setTtsRate(parseFloat(e.target.value) || 0.93));
+  $('tts-rate-num').addEventListener('change', (e) => {
+    setTtsRate(parseFloat(e.target.value) || 0.93);
+    savePrefs();
+  });
   setTtsRate(parseFloat($('tts-rate').value) || 0.93); // sync state + boxes from the initial value
 
-  // Time limit belongs to the loaded game; edits here write it back (0 = no timer).
+  // Play settings are the teacher's own — persist them whenever they change.
   $('play-duration').addEventListener('change', () => {
-    const v = playDurationValue();
-    $('play-duration').value = v;
-    if (state.data) {
-      state.data.settings.durationSec = v;
-      updateCurrentGame();
-    }
+    $('play-duration').value = playDurationValue(); // clamp (0 = no timer)
+    savePrefs();
   });
+  $('mode').addEventListener('change', savePrefs);
+  $('strictness').addEventListener('change', savePrefs);
   populateVoices($('language').value);
   onVoices(() => populateVoices($('language').value)); // re-list once Edge's natural voices load
 
@@ -312,10 +314,9 @@ function updateCurrentGame() {
   const langName =
     [...$('language').options].find((o) => o.value === g.langCode)?.dataset.name || g.language || g.langCode;
   box.className = 'current-game';
-  const time = g.settings.durationSec > 0 ? `${g.settings.durationSec}s each` : 'no timer';
   box.innerHTML =
     `<b>${esc(g.title)}</b>` +
-    `<span>${esc(langName)} · ${g.letters.length} letters · ${g.players} player${g.players > 1 ? 's' : ''} · ${time}</span>`;
+    `<span>${esc(langName)} · ${g.letters.length} letters · ${g.players} player${g.players > 1 ? 's' : ''}</span>`;
 }
 
 function loadGameText(text, players) {
@@ -330,11 +331,9 @@ function loadGameText(text, players) {
     return;
   }
   state.data = result.game;
-  // Sync only the play settings (section 3) from the loaded game — never the
-  // section-1 prompt fields (language/letters/seconds), which stay independent.
-  $('mode').value = result.game.settings.mode;
-  $('strictness').value = result.game.settings.strictness;
-  $('play-duration').value = result.game.settings.durationSec;
+  // A game is only its CONTENT: sync the game language (drives voice/ASR) and the
+  // player count (word sets). Play settings — mode/strictness/time/voice — are the
+  // teacher's own and are never touched by loading a game.
   const langSel = $('language'); // section-3 game language
   if ([...langSel.options].some((o) => o.value === result.game.langCode)) {
     langSel.value = result.game.langCode;
@@ -440,7 +439,6 @@ function removeSet() {
 function openEditor(blank) {
   const data = blank === true ? null : state.data;
   $('editor-title').value = data?.title || '';
-  $('editor-duration').value = data?.settings?.durationSec ?? 300; // ?? keeps an explicit 0 (no timer)
   const lang = $('editor-lang');
   const known = [...lang.options].map((o) => o.value);
   lang.value = data && known.includes(data.langCode) ? data.langCode : $('language').value;
@@ -528,14 +526,7 @@ function saveEditorData() {
     language: opt.dataset.name,
     langCode: opt.value,
     players: state.edit.sets, // one word set per player
-    settings: {
-      durationSec: (() => {
-        const v = Math.floor(+$('editor-duration').value);
-        return Number.isFinite(v) && v >= 0 ? v : 300; // 0 = no timer
-      })(),
-      mode: $('mode').value,
-      strictness: parseFloat($('strictness').value),
-    },
+    // No settings block: a game is content only; play settings live with the teacher.
     letters,
   };
   const result = validateGame(game);
@@ -684,6 +675,49 @@ function playDurationValue() {
   return Number.isFinite(v) && v >= 0 ? Math.min(3600, v) : 300;
 }
 
+// ---------- Play-settings persistence ----------
+// Play settings belong to the teacher, not to any game: they are remembered on
+// this laptop and NEVER changed by loading a game (a game is only its content).
+const PREFS_KEY = 'password.prefs.v1';
+
+function savePrefs() {
+  try {
+    localStorage.setItem(
+      PREFS_KEY,
+      JSON.stringify({
+        mode: $('mode').value,
+        strictness: parseFloat($('strictness').value),
+        durationSec: playDurationValue(),
+        ttsRate: state.ttsRate,
+        autoRead: state.autoRead,
+      })
+    );
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function applyPrefs() {
+  let p = null;
+  try {
+    p = JSON.parse(localStorage.getItem(PREFS_KEY));
+  } catch {
+    /* none saved */
+  }
+  if (!p) return;
+  if (p.mode && [...$('mode').options].some((o) => o.value === p.mode)) $('mode').value = p.mode;
+  if (typeof p.strictness === 'number') {
+    $('strictness').value = p.strictness;
+    if ($('strictness-out')) $('strictness-out').textContent = p.strictness;
+  }
+  if (typeof p.durationSec === 'number') $('play-duration').value = p.durationSec;
+  if (typeof p.ttsRate === 'number') setTtsRate(p.ttsRate);
+  if (typeof p.autoRead === 'boolean') {
+    state.autoRead = p.autoRead;
+    $('auto-read').checked = p.autoRead;
+  }
+}
+
 // Snapshot the settings that can be pushed to (or launched into) a live game.
 function currentSettings() {
   return {
@@ -812,6 +846,7 @@ function applyLiveSettings(s = {}) {
 
   // Settings take effect internally and on the next clue (no forced re-read; the
   // teacher can press 🔊 to re-hear the current clue in a new voice/language).
+  savePrefs(); // changes pushed from the panel/phone are teacher prefs too
   pushRemoteState();
   toast('Settings applied');
 }
@@ -975,8 +1010,10 @@ function makeRecognizer(lang) {
 
 function startGame(players) {
   const data = state.data;
+  // Stamp the teacher's play settings onto the runtime copy the engine reads.
   data.settings.mode = $('mode').value;
   data.settings.strictness = parseFloat($('strictness').value);
+  data.settings.durationSec = playDurationValue();
 
   const game = new Game(data, players);
   state.game = game;
@@ -1354,11 +1391,15 @@ if (bc) {
 
 // ---------- boot ----------
 setupScreen();
+applyPrefs(); // restore the teacher's play settings (games never override them)
 bindGameControls();
 bindEditor();
 const remoteReady = initRemoteLink(); // resolves once we know whether the neural server is up
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
-$('auto-read')?.addEventListener('change', (e) => (state.autoRead = e.target.checked));
+$('auto-read')?.addEventListener('change', (e) => {
+  state.autoRead = e.target.checked;
+  savePrefs();
+});
 $('apply-live')?.addEventListener('click', applyToLiveGame);
 
 if (isPlayMode) {
