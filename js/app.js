@@ -565,7 +565,10 @@ function persistStore(obj) {
   }
 }
 
-const libMeta = (game) => `${(game.langCode || '??').slice(0, 2)} · ${game.letters?.length || 0} letters`;
+const libMeta = (game) => {
+  const players = game.players || 0;
+  return `${(game.langCode || '??').slice(0, 2)} · ${game.letters?.length || 0} letters · ${players} player${players === 1 ? '' : 's'}`;
+};
 
 // Render the saved-games library: one clickable row per game (open / edit / delete).
 function renderLibrary() {
