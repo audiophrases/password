@@ -11,10 +11,12 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Stopping any previous Password server...
-rem Kill whatever is already listening on port 8000 (a leftover server) so this
-rem run starts clean instead of failing with "address in use".
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8000" ^| findstr LISTENING') do taskkill /F /PID %%a >nul 2>nul
+echo Stopping any previous Password server/window...
+rem Close the previous Password TERMINAL (any other cmd.exe running this .bat,
+rem even if it's sitting at 'Server stopped / pause'), then free port 8000.
+rem $me = this window's cmd PID (the parent of the spawned powershell), so we
+rem never kill ourselves.
+powershell -NoProfile -Command "$me=(Get-CimInstance Win32_Process -Filter ('ProcessId='+$PID)).ParentProcessId; Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'cmd.exe' -and $_.CommandLine -match 'password\.bat' -and $_.ProcessId -ne $me } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>nul
 
 echo ============================================
 echo   PASSWORD - starting local server
