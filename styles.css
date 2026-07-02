@@ -253,9 +253,10 @@ body.cam-on .circle.active .circle-score {
   border-radius: 14px; padding: 12px 18px;
 }
 .clue-left { display: flex; flex-direction: column; align-items: center; line-height: 1; }
-#clue-letter { font-size: 34px; font-weight: 800; color: var(--ok); }
+/* clamp() scales the clue up on a projector/TV while staying compact on a laptop */
+#clue-letter { font-size: clamp(34px, 4.5vmin, 48px); font-weight: 800; color: var(--ok); }
 #clue-kind { color: var(--muted); font-size: 11px; margin-top: 2px; }
-.clue-text { margin: 0; font-size: 19px; }
+.clue-text { margin: 0; font-size: clamp(19px, 2.6vmin, 27px); }
 body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box */
 
 .heard { position: absolute; bottom: 168px; left: 50%; transform: translateX(-50%); color: var(--muted); font-size: 15px; z-index: 5; }
@@ -298,4 +299,7 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
 .result-card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 28px 34px; min-width: 320px; text-align: center; box-shadow: 0 12px 40px rgba(20, 35, 59, .25); }
 .result-card h2 { margin: 0 0 16px; font-size: 26px; }
 .result-row { display: flex; justify-content: space-between; gap: 30px; padding: 6px 0; font-size: 18px; border-bottom: 1px solid var(--line); }
+/* rows arrive ranked — crown the winner */
+.result-row:first-child { font-size: 21px; font-weight: 700; }
+.result-row:first-child span:first-child::before { content: '🏆 '; }
 .result-card .btn { margin-top: 18px; }
