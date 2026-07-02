@@ -35,14 +35,18 @@ function secMsGec(skew = 0) {
   return crypto.createHash('sha256').update(`${BigInt(ticks)}${TRUSTED_TOKEN}`).digest('hex').toUpperCase();
 }
 
-function buildSsml(text, voice, isSsml = false) {
+function buildSsml(text, voice, isSsml = false, rate = 1) {
   // When isSsml, `text` is a ready inner-SSML fragment (client pre-escaped the
   // dynamic parts); otherwise escape it as plain text.
   const inner = isSsml ? text : String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const lang = voice.slice(0, 5); // e.g. "ca-ES"
+  // Speed as an SSML prosody rate: a signed % change from normal (keeps pitch,
+  // unlike a client-side playbackRate). 0.99 -> -1%, 1.05 -> +5%.
+  const pct = Math.round((Math.min(1.5, Math.max(0.5, Number(rate) || 1)) - 1) * 100);
+  const rateAttr = `${pct >= 0 ? '+' : ''}${pct}%`;
   return (
     `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'>` +
-    `<voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${inner}</prosody></voice></speak>`
+    `<voice name='${voice}'><prosody pitch='+0Hz' rate='${rateAttr}' volume='+0%'>${inner}</prosody></voice></speak>`
   );
 }
 
@@ -69,7 +73,7 @@ function maskedFrame(payload, opcode = 0x1) {
   return Buffer.concat([header, mask, masked]);
 }
 
-function synthesize(text, voice, skew = 0, retried = false, isSsml = false) {
+function synthesize(text, voice, skew = 0, retried = false, isSsml = false, rate = 1) {
   return new Promise((resolve, reject) => {
     const connId = crypto.randomUUID().replace(/-/g, '');
     const query =
@@ -148,7 +152,7 @@ function synthesize(text, voice, skew = 0, retried = false, isSsml = false) {
             } catch {
               /* ignore */
             }
-            synthesize(text, voice, serverMs / 1000 - Date.now() / 1000, true, isSsml).then(resolve, reject);
+            synthesize(text, voice, serverMs / 1000 - Date.now() / 1000, true, isSsml, rate).then(resolve, reject);
             return;
           }
           return finish(new Error('handshake: ' + head.split('\r\n')[0]));
@@ -165,7 +169,7 @@ function synthesize(text, voice, skew = 0, retried = false, isSsml = false) {
         socket.write(
           maskedFrame(
             `X-RequestId:${connId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${ts}\r\nPath:ssml\r\n\r\n` +
-              buildSsml(text, voice, isSsml)
+              buildSsml(text, voice, isSsml, rate)
           )
         );
       }
@@ -248,12 +252,13 @@ const server = http.createServer((req, res) => {
     const voice = u.searchParams.get('voice') || 'en-US-AvaNeural';
     const text = u.searchParams.get('text') || '';
     const isSsml = u.searchParams.get('ssml') === '1';
+    const rate = parseFloat(u.searchParams.get('rate')) || 1;
     if (!text) {
       res.writeHead(400);
       res.end('no text');
       return;
     }
-    synthesize(text, voice, 0, false, isSsml)
+    synthesize(text, voice, 0, false, isSsml, rate)
       .then((audio) => {
         res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
         res.end(audio);

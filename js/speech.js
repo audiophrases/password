@@ -148,18 +148,18 @@ export function bestVoice(langCode) {
 let keepAlive = null;
 let speakToken = 0;
 
-export function speak(text, langCode = 'en-US', voiceName = null) {
+export function speak(text, langCode = 'en-US', voiceName = null, rate = 1) {
   if (!window.speechSynthesis || !text) return;
   stopSpeaking();
   const token = ++speakToken;
   // Hold the utterance until Edge's natural voices have loaded — otherwise the
   // first spoken clue of a session comes out in the robotic default voice.
   whenVoicesReady(() => {
-    if (token === speakToken) utter(text, langCode, voiceName);
+    if (token === speakToken) utter(text, langCode, voiceName, rate);
   });
 }
 
-function utter(text, langCode, voiceName) {
+function utter(text, langCode, voiceName, rate) {
   const u = new SpeechSynthesisUtterance(text);
   u.lang = langCode;
   const two = langCode.slice(0, 2).toLowerCase();
@@ -170,7 +170,7 @@ function utter(text, langCode, voiceName) {
   }
   if (!voice) voice = bestVoice(langCode);
   if (voice) u.voice = voice;
-  u.rate = 0.95;
+  u.rate = Math.min(4, Math.max(0.1, rate || 1));
   u.pitch = 1;
   u.onend = () => clearInterval(keepAlive);
   u.onerror = () => clearInterval(keepAlive);

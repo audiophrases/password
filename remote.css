@@ -53,11 +53,16 @@ body.offline .status::before { content: 'Reconnecting… '; }
 .big.no { background: var(--no); }
 .big.pass { background: var(--pass); color: #1c1300; }
 
-.talk {
-  border: 2px solid var(--line); background: #fff; color: var(--ink);
-  border-radius: 16px; padding: 18px; font-size: 20px; font-weight: 800;
+/* Primary read-aloud button — the big prominent control. */
+.clue {
+  border: none; border-radius: 18px; background: #2f6df6; color: #fff;
+  padding: 26px; font-size: 26px; font-weight: 800;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .14);
 }
-.talk.live { background: var(--no); border-color: var(--no); color: #fff; }
+.clue:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .14); }
+
+/* Push-to-talk now lives in the row below (styled by .row2 button); light its live state. */
+#talk.live { background: var(--no); border-color: var(--no); color: #fff; }
 
 .row2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .row2 button {
@@ -66,4 +71,4 @@ body.offline .status::before { content: 'Reconnecting… '; }
 }
 .row2 button:active { background: #e8eef9; }
 
-body.offline .pad, body.offline .talk, body.offline .row2 { opacity: .45; pointer-events: none; }
+body.offline .pad, body.offline .clue, body.offline .row2 { opacity: .45; pointer-events: none; }

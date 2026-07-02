@@ -36,6 +36,7 @@ const state = {
   camera: new Camera(),
   cameraOn: false,
   autoRead: false,
+  ttsRate: 1, // read-aloud speed multiplier (1 = normal); fine-tuned in Settings
   voiceName: null,
   voicePicked: false,
   neuralAvailable: false,
@@ -147,7 +148,17 @@ function neuralFailed() {
   populateVoices($('language').value);
 }
 
-const ttsUrl = (voiceId, text) => `/tts?voice=${encodeURIComponent(voiceId)}&text=${encodeURIComponent(text)}`;
+// Read-aloud speed: keep state, the slider, and its label in sync (clamped to
+// the slider's range). Used from Setup and when settings are pushed to a live game.
+function setTtsRate(v) {
+  const rate = Math.min(1.5, Math.max(0.5, +v || 1));
+  state.ttsRate = rate;
+  if ($('tts-rate')) $('tts-rate').value = rate;
+  if ($('tts-rate-out')) $('tts-rate-out').textContent = rate.toFixed(2);
+}
+
+const ttsUrl = (voiceId, text, rate) =>
+  `/tts?voice=${encodeURIComponent(voiceId)}&text=${encodeURIComponent(text)}&rate=${encodeURIComponent(rate)}`;
 
 // Generic narration of a single piece of text (used by the voice test button).
 function narrate(text, langCode) {
@@ -161,13 +172,13 @@ function narrate(text, langCode) {
     ttsAudio.onerror = () => {
       ttsAudio.onerror = null;
       neuralFailed();
-      speak(text, langCode, state.voiceName);
+      speak(text, langCode, state.voiceName, state.ttsRate);
     };
-    ttsAudio.src = ttsUrl(voiceId, text);
+    ttsAudio.src = ttsUrl(voiceId, text, state.ttsRate);
     ttsAudio.play().catch(() => {});
     return;
   }
-  speak(text, langCode, state.voiceName);
+  speak(text, langCode, state.voiceName, state.ttsRate);
 }
 
 function stopNarration() {
@@ -219,6 +230,8 @@ function setupScreen() {
     state.voicePicked = false;
     populateVoices($('language').value);
   });
+  $('tts-rate').addEventListener('input', (e) => setTtsRate(parseFloat(e.target.value) || 1));
+  setTtsRate(parseFloat($('tts-rate').value) || 1); // sync state + label from the initial slider value
   populateVoices($('language').value);
   onVoices(() => populateVoices($('language').value)); // re-list once Edge's natural voices load
 
@@ -632,6 +645,7 @@ function currentSettings() {
     voiceName: state.voiceName,
     useNeural: state.useNeural,
     autoRead: state.autoRead,
+    ttsRate: state.ttsRate,
     players: state.players.map((p) => ({ name: p.name, color: p.color })),
   };
 }
@@ -700,6 +714,7 @@ function applyLiveSettings(s = {}) {
     $('auto-read').checked = s.autoRead;
   }
   if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural && state.neuralAvailable && !state.neuralBroken;
+  if (typeof s.ttsRate === 'number') setTtsRate(s.ttsRate);
 
   // Time bank: adjust each running clock by the change so elapsed time is kept.
   if (typeof s.durationSec === 'number' && s.durationSec > 0) g.setDuration(s.durationSec);
@@ -1233,6 +1248,7 @@ function bootPlay() {
   const s = payload.settings || {};
   state.autoRead = !!s.autoRead;
   $('auto-read').checked = state.autoRead;
+  if (typeof s.ttsRate === 'number') setTtsRate(s.ttsRate);
   if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural;
   if (s.voiceName) {
     state.voiceName = s.voiceName;
