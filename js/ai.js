@@ -32,7 +32,7 @@ Return ONLY valid JSON (no markdown, no commentary) matching this exact schema:
   "title": "string — short name for this round",
   "language": "${language}",
   "langCode": "${langCode}",
-  "settings": { "durationSec": ${durationSec}, "mode": "voice-assist", "strictness": 0.7 },
+  "settings": { "durationSec": ${durationSec}, "mode": "voice-auto", "strictness": 0.7 },
   "players": ${n},
   "letters": [
     {
@@ -111,7 +111,7 @@ export function validateGame(obj) {
     players,
     settings: {
       durationSec: Number(obj.settings?.durationSec) || 200,
-      mode: obj.settings?.mode || 'voice-assist',
+      mode: obj.settings?.mode || 'voice-auto',
       strictness: typeof obj.settings?.strictness === 'number' ? obj.settings.strictness : 0.7,
     },
     letters,
