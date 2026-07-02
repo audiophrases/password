@@ -291,6 +291,24 @@ function setupScreen() {
     : 'Speech recognition needs Chrome/Edge (teacher-judge and type-in still work). Open in Edge for the most natural voices.';
 }
 
+// Section-3 status chip: which game the play settings / Start apply to.
+function updateCurrentGame() {
+  const box = $('current-game');
+  if (!box) return;
+  const g = state.data;
+  if (!g) {
+    box.className = 'current-game none';
+    box.innerHTML = 'No game loaded — pick or create one in <b>2 · Your games</b>.';
+    return;
+  }
+  const langName =
+    [...$('language').options].find((o) => o.value === g.langCode)?.dataset.name || g.language || g.langCode;
+  box.className = 'current-game';
+  box.innerHTML =
+    `<b>${esc(g.title)}</b>` +
+    `<span>${esc(langName)} · ${g.letters.length} letters · ${g.players} player${g.players > 1 ? 's' : ''} · ${g.settings.durationSec}s each</span>`;
+}
+
 function loadGameText(text, players) {
   const result = parseGameText(text);
   const msg = $('validation');
@@ -299,6 +317,7 @@ function loadGameText(text, players) {
     msg.textContent = result.errors.slice(0, 4).join(' ');
     state.data = null;
     $('start-game').disabled = true;
+    updateCurrentGame();
     return;
   }
   state.data = result.game;
@@ -316,6 +335,7 @@ function loadGameText(text, players) {
   msg.className = 'msg ok';
   msg.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
   $('start-game').disabled = false;
+  updateCurrentGame();
   pushRemoteState();
   renderLibrary();
 }
@@ -514,6 +534,7 @@ function saveEditorData() {
   v.className = 'msg ok';
   v.textContent = `Loaded "${result.game.title}" — ${result.game.letters.length} letters. Ready.`;
   $('start-game').disabled = false;
+  updateCurrentGame();
   return true;
 }
 
