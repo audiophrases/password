@@ -204,12 +204,16 @@ function setupScreen() {
   // Number of players (source of truth lives in section 1).
   $('num-players').addEventListener('change', () => setPlayerCount(+$('num-players').value));
 
-  // Language drives the default letter set, speech recognition, and the read-aloud voice.
+  // Section 1 language is for the PROMPT only: it just fills in the default letter
+  // set to draft. It never touches a loaded game or the read-aloud voice.
+  $('prompt-lang').addEventListener('change', () => {
+    $('letters').value = $('prompt-lang').selectedOptions[0].dataset.letters;
+  });
+  // Section 3 language is the GAME's: it drives speech recognition + the read-aloud
+  // voice, and follows a loaded game.
   $('language').addEventListener('change', () => {
-    const opt = $('language').selectedOptions[0];
-    $('letters').value = opt.dataset.letters;
     state.voicePicked = false; // re-auto-pick the best voice for the new language
-    populateVoices(opt.value);
+    populateVoices($('language').value);
   });
   $('voice').addEventListener('change', () => {
     state.voiceName = $('voice').value || null;
@@ -239,7 +243,7 @@ function setupScreen() {
   onVoices(() => populateVoices($('language').value)); // re-list once Edge's natural voices load
 
   $('build-prompt').addEventListener('click', () => {
-    const opt = $('language').selectedOptions[0];
+    const opt = $('prompt-lang').selectedOptions[0];
     const letters = ($('letters').value || ALPHABET_EN.join('')).toUpperCase().replace(/[^A-ZÑ]/g, '').split('');
     const prompt = buildPrompt({
       language: opt.dataset.name,
@@ -298,15 +302,13 @@ function loadGameText(text, players) {
     return;
   }
   state.data = result.game;
-  // sync UI defaults from the loaded game
+  // Sync only the play settings (section 3) from the loaded game — never the
+  // section-1 prompt fields (language/letters/seconds), which stay independent.
   $('mode').value = result.game.settings.mode;
   $('strictness').value = result.game.settings.strictness;
-  $('duration').value = result.game.settings.durationSec || 200;
-  // sync the language selector + voice picker to the loaded game's language
-  const langSel = $('language');
+  const langSel = $('language'); // section-3 game language
   if ([...langSel.options].some((o) => o.value === result.game.langCode)) {
     langSel.value = result.game.langCode;
-    $('letters').value = langSel.selectedOptions[0].dataset.letters;
     state.voicePicked = false;
     populateVoices(result.game.langCode);
   }
@@ -1260,7 +1262,6 @@ function bootPlay() {
   const ls = $('language');
   if (s.langCode && [...ls.options].some((o) => o.value === s.langCode)) {
     ls.value = s.langCode;
-    $('letters').value = ls.selectedOptions[0].dataset.letters;
     populateVoices(s.langCode);
   }
   if (s.mode) $('mode').value = s.mode;

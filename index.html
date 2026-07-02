@@ -22,7 +22,7 @@
         <p class="hint card-note">Builds a prompt to paste into ChatGPT / Claude / any chatbot. These fields only shape that prompt — they don't change a game you've already loaded. Players &amp; seconds here just seed the prompt; a loaded game keeps its own.</p>
         <div class="field-row">
           <label>Language
-            <select id="language">
+            <select id="prompt-lang">
               <option value="en-US" data-name="English" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" selected>English</option>
               <option value="ca-ES" data-name="Catalan" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Catalan</option>
               <option value="fr-FR" data-name="French" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">French</option>
@@ -73,6 +73,16 @@
       <div class="card">
         <h2>3 · Play settings</h2>
         <p class="hint card-note">How the loaded game is judged and read aloud. Set these before you start — or push them to a running game with ⚡ Apply, no restart needed.</p>
+
+        <label>Game language
+          <select id="language">
+            <option value="en-US" data-name="English" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" selected>English</option>
+            <option value="ca-ES" data-name="Catalan" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Catalan</option>
+            <option value="fr-FR" data-name="French" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">French</option>
+            <option value="es-ES" data-name="Spanish" data-letters="ABCDEFGHIJKLMNÑOPQRSTUVWXYZ">Spanish</option>
+          </select>
+        </label>
+        <p class="hint">Reflects the loaded game and sets the read-aloud voice &amp; speech recognition. Independent of the prompt language in section 1.</p>
 
         <div class="group-label">Players <span class="hint">count comes from section 1 or the loaded game</span></div>
         <div id="players-list"></div>
