@@ -35,7 +35,7 @@ const state = {
   recognizer: null,
   camera: new Camera(),
   cameraOn: false,
-  autoRead: false,
+  autoRead: true, // read clues aloud by default (checkbox in Play settings)
   ttsRate: 1, // read-aloud speed multiplier (1 = normal); fine-tuned in Settings
   voiceName: null,
   voicePicked: false,
