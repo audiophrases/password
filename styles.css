@@ -63,6 +63,7 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 .hint { color: var(--muted); font-size: 12.5px; margin: 4px 0 8px; }
 .slider { display: flex; align-items: center; gap: 10px; }
 .slider input { flex: 1; }
+.slider input.num { flex: 0 0 4.5rem; width: 4.5rem; text-align: center; }
 .check { display: flex; align-items: center; gap: 8px; }
 .check input { width: auto; }
 .voice-pick { display: flex; gap: 6px; align-items: center; margin-top: 4px; }

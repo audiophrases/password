@@ -154,7 +154,7 @@ function setTtsRate(v) {
   const rate = Math.min(1.5, Math.max(0.5, +v || 1));
   state.ttsRate = rate;
   if ($('tts-rate')) $('tts-rate').value = rate;
-  if ($('tts-rate-out')) $('tts-rate-out').textContent = rate.toFixed(2);
+  if ($('tts-rate-num')) $('tts-rate-num').value = rate.toFixed(2);
 }
 
 const ttsUrl = (voiceId, text, rate) =>
@@ -230,8 +230,11 @@ function setupScreen() {
     state.voicePicked = false;
     populateVoices($('language').value);
   });
+  // Slider drags update everything live; the number box lets you type an exact
+  // value (e.g. 0.89) and commits on blur/Enter.
   $('tts-rate').addEventListener('input', (e) => setTtsRate(parseFloat(e.target.value) || 1));
-  setTtsRate(parseFloat($('tts-rate').value) || 1); // sync state + label from the initial slider value
+  $('tts-rate-num').addEventListener('change', (e) => setTtsRate(parseFloat(e.target.value) || 1));
+  setTtsRate(parseFloat($('tts-rate').value) || 1); // sync state + boxes from the initial value
   populateVoices($('language').value);
   onVoices(() => populateVoices($('language').value)); // re-list once Edge's natural voices load
 
