@@ -260,7 +260,6 @@ function setupScreen() {
       level: $('level').value,
       topic: $('topic').value.trim() || 'everyday vocabulary',
       letters: letters.length ? letters : ALPHABET_EN,
-      langCode: opt.value,
       players: state.players.length,
     });
     $('prompt-output').value = prompt;

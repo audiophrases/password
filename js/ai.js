@@ -8,7 +8,6 @@ export function buildPrompt({
   level = 'A2',
   topic = 'everyday vocabulary',
   letters = ALPHABET_EN,
-  langCode = 'en-US',
   players = 1,
 }) {
   const letterList = letters.join(', ');
@@ -30,8 +29,6 @@ Return ONLY valid JSON (no markdown, no commentary) matching this exact schema:
 {
   "title": "string — short name for this round",
   "language": "${language}",
-  "langCode": "${langCode}",
-  "settings": { "mode": "voice-auto", "strictness": 0.7 },
   "players": ${n},
   "letters": [
     {
@@ -58,6 +55,25 @@ Rules:
 - Keep answers to a single word where possible, lowercase, no punctuation.
 - Clues must be solvable at ${level} and must never contain their own answer.
 - Output JSON only.`;
+}
+
+// The prompt no longer asks the AI for langCode (an app concern); recover the
+// dialect code from the echoed language name instead. Accepts native spellings.
+const LANG_CODES = {
+  english: 'en-US',
+  catalan: 'ca-ES',
+  'català': 'ca-ES',
+  french: 'fr-FR',
+  'français': 'fr-FR',
+  'francès': 'fr-FR',
+  spanish: 'es-ES',
+  'español': 'es-ES',
+  castellano: 'es-ES',
+  'castellà': 'es-ES',
+};
+function langCodeFor(obj) {
+  if (obj.langCode) return obj.langCode; // explicit code always wins
+  return LANG_CODES[String(obj.language || '').trim().toLowerCase()] || 'en-US';
 }
 
 export function validateGame(obj) {
@@ -106,7 +122,7 @@ export function validateGame(obj) {
   const game = {
     title: obj.title || 'Untitled round',
     language: obj.language || 'English',
-    langCode: obj.langCode || 'en-US',
+    langCode: langCodeFor(obj),
     players,
     settings: {
       // default 300s; an explicit 0 is kept and means "no timer"
