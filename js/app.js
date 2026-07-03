@@ -999,8 +999,23 @@ function pushRemoteState() {
       autoRead: state.autoRead,
       durationSec: g.duration,
       players: g.players.map((pl) => ({ name: pl.name, color: pl.color })),
+      ...remoteVoiceChoices(g.data.langCode),
     },
   });
+}
+
+// Neural voices for the game's language (e.g. Catalan: Enric, Joana), plus the
+// one currently in use — lets the phone's ⚙ panel offer a voice picker. Empty
+// when the neural server isn't available (the picker hides itself).
+function remoteVoiceChoices(langCode) {
+  if (!(state.useNeural && state.neuralAvailable && !state.neuralBroken)) return { voices: [], voiceId: '' };
+  const sel = $('voice').selectedOptions[0];
+  const selId = sel && sel.dataset.type === 'neural' ? sel.value : null;
+  const list = NEURAL_VOICES[langCode] || NEURAL_VOICES['en-US'];
+  return {
+    voices: list.map((id) => ({ id, label: neuralLabel(id) })),
+    voiceId: neuralVoiceFor(langCode, selId),
+  };
 }
 
 // ---------- Game screen ----------
