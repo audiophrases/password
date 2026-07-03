@@ -359,7 +359,7 @@ function bindAppend() {
     }
     flash($('mix-circles'), 'Mixed!');
     v.className = 'msg ok';
-    v.textContent = `Circles mixed — all ${res.sets} players get different words than last time. ▶ Start when ready (💾 Save only if you want to keep this arrangement).`;
+    v.textContent = `Circles mixed — each of the ${res.sets} circles is now a random blend of the old ones, letter by letter. ▶ Start when ready (💾 Save only if you want to keep this arrangement).`;
     pushRemoteState();
   });
 

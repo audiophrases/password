@@ -131,20 +131,33 @@ export function appendSets(game, incoming) {
   return { ok: true, errors: [], added: add, total: current + add, duplicates };
 }
 
-// Mix the circles for a replay with the same class: per letter, rotate which
-// player gets which word by a random non-zero offset — so every player is
-// GUARANTEED a different word on every letter than last time, while each circle
-// stays a complete alphabet. Mutates the game. Needs at least 2 word sets.
+// Mix the circles for a replay with the same class: every letter shuffles which
+// player gets which word (uniform random permutation), so each new circle is a
+// random blend of the old ones — e.g. A from old circle 3, B from old circle 2,
+// C from old circle 1. Circles stay complete alphabets over the same word pool.
+// Mutates the game. Needs at least 2 word sets (with 1 there is nothing to mix).
 export function mixSets(game, rand = Math.random) {
   const sets = Math.max(...game.letters.map((l) => l.variants.length));
   if (sets < 2) {
     return { ok: false, errors: ['Mixing needs at least 2 circles of words — this game has only 1.'] };
   }
+  let changed = false;
   for (const l of game.letters) {
     const k = l.variants.length;
     if (k < 2) continue; // single word for this letter — nothing to mix
-    const off = 1 + Math.floor(rand() * (k - 1)); // never 0: everyone changes word
-    l.variants = l.variants.map((_, i) => l.variants[(i + off) % k]);
+    for (let i = k - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1)); // Fisher-Yates
+      if (j !== i) {
+        [l.variants[i], l.variants[j]] = [l.variants[j], l.variants[i]];
+        changed = true;
+      }
+    }
+  }
+  if (!changed) {
+    // Astronomically rare with a full alphabet, but never return "mixed" with
+    // everything identical: force one swap on the first mixable letter.
+    const l = game.letters.find((x) => x.variants.length >= 2);
+    [l.variants[0], l.variants[1]] = [l.variants[1], l.variants[0]];
   }
   return { ok: true, errors: [], sets };
 }
