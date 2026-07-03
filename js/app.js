@@ -646,6 +646,184 @@ function deleteSaved(name) {
   renderLibrary();
 }
 
+// ---------- Results history (browser storage) ----------
+// Every finished round is recorded so difficult words can be reviewed later —
+// and turned into a fresh "review round" with one click.
+
+const HISTORY_KEY = 'password.history.v1';
+const HISTORY_MAX = 40;
+
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+function persistHistory(list) {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_MAX)));
+  } catch (e) {
+    console.warn('Could not save history:', e);
+  }
+}
+
+// Words a player did not get right. For a full round that includes letters the
+// clock cut off ("unanswered" — they're still part of the vocabulary to review);
+// for an early exit only actually attempted letters (wrong/passed) count.
+function missedFor(g, i, partial) {
+  const p = g.players[i];
+  return g.order
+    .filter((L) => {
+      const s = p.results[L];
+      if (s === 'correct') return false;
+      return partial ? s === 'wrong' || s === 'passed' : true;
+    })
+    .map((L) => {
+      const e = g.entryFor(i, L);
+      const s = p.results[L];
+      return {
+        letter: L,
+        answer: e?.answer || '',
+        clue: e?.clue || '',
+        type: e?.type || 'starts',
+        status: s === 'wrong' ? 'wrong' : s === 'passed' ? 'passed' : 'unanswered',
+      };
+    });
+}
+
+// Record the session once (guarded), skipping rounds where nothing was attempted.
+function recordSession(g, partial = false) {
+  if (!g || g._recorded) return;
+  const attempted = g.players.some((p) => Object.values(p.results).some((s) => s === 'correct' || s === 'wrong' || s === 'passed'));
+  if (!attempted) return;
+  g._recorded = true;
+  const session = {
+    at: Date.now(),
+    title: g.data.title || 'Untitled round',
+    langCode: g.data.langCode || 'en-US',
+    partial: !!partial,
+    players: g.players.map((p, i) => ({
+      name: p.name,
+      color: p.color,
+      score: g.score(p),
+      total: g.order.length,
+      missed: missedFor(g, i, partial),
+    })),
+  };
+  persistHistory([session, ...loadHistory()]);
+  renderHistory();
+}
+
+const STATUS_LABEL = { wrong: 'wrong', passed: 'passed', unanswered: 'not reached' };
+
+function historyDate(ts) {
+  const d = new Date(ts);
+  return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+// Words missed most often across all recorded sessions (top of the review pile).
+function mostMissed(history, limit = 8) {
+  const counts = new Map(); // answer -> { n, clue }
+  for (const s of history) {
+    for (const p of s.players) {
+      for (const m of p.missed) {
+        if (!m.answer || m.status === 'unanswered') continue; // only genuinely attempted
+        const cur = counts.get(m.answer) || { n: 0, clue: m.clue };
+        cur.n += 1;
+        counts.set(m.answer, cur);
+      }
+    }
+  }
+  return [...counts.entries()]
+    .filter(([, v]) => v.n >= 2)
+    .sort((a, b) => b[1].n - a[1].n)
+    .slice(0, limit)
+    .map(([answer, v]) => ({ answer, clue: v.clue, n: v.n }));
+}
+
+function renderHistory() {
+  const box = $('history');
+  if (!box) return;
+  const history = loadHistory();
+  box.innerHTML = '';
+  if (!history.length) {
+    box.innerHTML = '<p class="lib-empty">No rounds played yet — results will collect here automatically.</p>';
+    return;
+  }
+
+  history.forEach((s, idx) => {
+    const item = document.createElement('details');
+    item.className = 'h-item';
+    const scores = s.players.map((p) => `<b style="color:${esc(p.color || '#333')}">${esc(p.name)}</b> ${p.score}/${p.total}`).join(' · ');
+    const missedCount = s.players.reduce((n, p) => n + p.missed.length, 0);
+    item.innerHTML =
+      `<summary><span class="h-date">${historyDate(s.at)}${s.partial ? ' · partial' : ''}</span>` +
+      `<span class="h-title">${esc(s.title)}</span><span class="h-scores">${scores}</span></summary>` +
+      s.players
+        .map((p) => {
+          if (!p.missed.length) return `<div class="h-player"><b style="color:${esc(p.color || '#333')}">${esc(p.name)}</b> — all correct 🎉</div>`;
+          const words = p.missed
+            .map((m) => `<span class="h-word ${m.status}" title="${esc(m.clue)} (${STATUS_LABEL[m.status] || m.status})"><i>${esc(m.letter)}</i>${esc(m.answer)}</span>`)
+            .join('');
+          return `<div class="h-player"><b style="color:${esc(p.color || '#333')}">${esc(p.name)}</b>${words}</div>`;
+        })
+        .join('') +
+      `<div class="h-actions">` +
+      (missedCount ? `<button class="btn small h-practice">▶ Practice the ${missedCount} missed word${missedCount > 1 ? 's' : ''}</button>` : '') +
+      `<button class="btn ghost small h-del">🗑</button></div>`;
+    item.querySelector('.h-practice')?.addEventListener('click', () => practiceSession(idx));
+    item.querySelector('.h-del').addEventListener('click', () => {
+      const h = loadHistory();
+      h.splice(idx, 1);
+      persistHistory(h);
+      renderHistory();
+    });
+    box.appendChild(item);
+  });
+
+  const agg = mostMissed(history);
+  if (agg.length) {
+    const div = document.createElement('div');
+    div.className = 'h-agg';
+    div.innerHTML =
+      '<span class="h-agg-label">Missed more than once:</span>' +
+      agg.map((w) => `<span class="h-word wrong" title="${esc(w.clue)}">${esc(w.answer)} ×${w.n}</span>`).join('');
+    box.appendChild(div);
+  }
+
+  const clear = document.createElement('button');
+  clear.className = 'btn ghost small h-clear';
+  clear.textContent = 'Clear history';
+  clear.addEventListener('click', () => {
+    persistHistory([]);
+    renderHistory();
+  });
+  box.appendChild(clear);
+}
+
+// Build a playable round out of one session's missed words and load it. Letters
+// missed by several players (different words) become per-player variants, so the
+// review round naturally has one circle per word set.
+function practiceSession(idx) {
+  const s = loadHistory()[idx];
+  if (!s) return;
+  const byLetter = new Map();
+  s.players.forEach((p) =>
+    p.missed.forEach((m) => {
+      if (!m.answer) return;
+      const cur = byLetter.get(m.letter) || { letter: m.letter, type: m.type, variants: [] };
+      if (!cur.variants.some((v) => v.answer === m.answer)) cur.variants.push({ answer: m.answer, accept: [], clue: m.clue });
+      byLetter.set(m.letter, cur);
+    })
+  );
+  const letters = [...byLetter.values()].sort((a, b) => a.letter.localeCompare(b.letter));
+  if (!letters.length) return;
+  const game = { title: `Review: ${s.title}`, langCode: s.langCode, letters };
+  loadGameText(JSON.stringify(game), state.players);
+  $('current-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function bindEditor() {
   $('edit-game').addEventListener('click', () => openEditor(true));
   $('save-local').addEventListener('click', saveLocal);
@@ -1335,12 +1513,25 @@ async function toggleCamera() {
 
 function showResults() {
   stopNarration();
+  recordSession(state.game); // save to history before showing
   const overlay = $('result');
-  const rows = state.game
+  const g = state.game;
+  const rows = g
     .results()
     .map((r, i) => `<div class="result-row"><span>${i + 1}. <b style="color:${r.color}">${r.name}</b></span><span>${r.score} correct</span></div>`)
     .join('');
-  $('result-body').innerHTML = rows;
+  // Review the tricky words with the class right away: everything not answered
+  // correctly, with the clue on hover.
+  const missed = g.players
+    .map((p, i) => {
+      const words = missedFor(g, i, false)
+        .map((m) => `<span class="h-word ${m.status}" title="${esc(m.clue)}"><i>${esc(m.letter)}</i>${esc(m.answer)}</span>`)
+        .join('');
+      return words ? `<div class="h-player"><b style="color:${esc(p.color)}">${esc(p.name)}</b>${words}</div>` : '';
+    })
+    .join('');
+  $('result-body').innerHTML =
+    rows + (missed ? `<div class="result-missed"><div class="h-agg-label">Words to review</div>${missed}</div>` : '');
   overlay.classList.remove('hidden');
   $('result-again').onclick = endToSetup;
   announceStatus(); // game.ended -> tell the control panel the round is over
@@ -1348,6 +1539,7 @@ function showResults() {
 
 function endToSetup() {
   stopNarration();
+  recordSession(state.game, true); // early exit: keep what was attempted (no-op if already saved)
   stopTalk();
   state.camera.stop($('cam'));
   state.cameraOn = false;
@@ -1404,7 +1596,10 @@ if (bc) {
     } else {
       if (m.t === 'status') {
         state.gameRunning = m.running;
-        if (!m.running) state.launchedPlay = false;
+        if (!m.running) {
+          state.launchedPlay = false;
+          renderHistory(); // the game tab just recorded a finished round
+        }
         updateLiveControls();
       }
     }
@@ -1416,6 +1611,7 @@ setupScreen();
 applyPrefs(); // restore the teacher's play settings (games never override them)
 bindGameControls();
 bindEditor();
+renderHistory();
 const remoteReady = initRemoteLink(); // resolves once we know whether the neural server is up
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
 $('auto-read')?.addEventListener('change', (e) => {

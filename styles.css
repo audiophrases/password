@@ -103,6 +103,33 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 .lib-edit, .lib-del { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font-size: 14px; cursor: pointer; }
 .lib-edit:hover { border-color: #aebacd; }
 .lib-del:hover { background: #faddd9; }
+/* results history & review */
+.history { display: flex; flex-direction: column; gap: 6px; max-height: 420px; overflow-y: auto; }
+.h-item { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.h-item summary {
+  cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.h-item summary::-webkit-details-marker { display: none; }
+.h-item summary::before { content: '▸'; color: var(--muted); }
+.h-item[open] summary::before { content: '▾'; }
+.h-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.h-title { font-weight: 700; font-size: 14px; flex: 1; }
+.h-scores { font-size: 13px; color: var(--muted); }
+.h-player { margin: 8px 0 0; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.h-word {
+  display: inline-flex; align-items: center; gap: 4px; border-radius: 999px;
+  padding: 2px 9px 2px 4px; font-size: 12.5px; font-weight: 600; cursor: help;
+}
+.h-word i { font-style: normal; font-weight: 800; border-radius: 50%; width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .65); font-size: 11px; }
+.h-word.wrong { background: #fbdcdc; color: #a12c20; }
+.h-word.passed { background: #fcefce; color: #97700f; }
+.h-word.unanswered { background: #e8edf5; color: var(--muted); }
+.h-actions { display: flex; gap: 8px; margin-top: 10px; }
+.h-agg { margin-top: 8px; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.h-agg .h-word { padding: 2px 9px; }
+.h-agg-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.h-clear { align-self: flex-start; margin-top: 6px; }
+
 .import { margin-top: 8px; }
 .import summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 6px 0; list-style: none; }
 .import summary::-webkit-details-marker { display: none; }
@@ -296,7 +323,14 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
 
 /* result overlay */
 .overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(20, 35, 59, .45); }
-.result-card { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 28px 34px; min-width: 320px; text-align: center; box-shadow: 0 12px 40px rgba(20, 35, 59, .25); }
+.result-card {
+  background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 28px 34px;
+  min-width: 320px; max-width: min(720px, 92vw); text-align: center;
+  box-shadow: 0 12px 40px rgba(20, 35, 59, .25);
+}
+#result-body { max-height: 62vh; overflow-y: auto; }
+.result-missed { text-align: left; margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.result-missed .h-agg-label { display: block; margin-bottom: 2px; }
 .result-card h2 { margin: 0 0 16px; font-size: 26px; }
 .result-row { display: flex; justify-content: space-between; gap: 30px; padding: 6px 0; font-size: 18px; border-bottom: 1px solid var(--line); }
 /* rows arrive ranked — crown the winner */
