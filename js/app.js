@@ -1,5 +1,5 @@
 // app.js — wires the setup screen, game engine, speech, and camera together.
-import { buildPrompt, parseGameText, validateGame, ALPHABET_EN } from './ai.js';
+import { buildPrompt, buildAppendPrompt, appendSets, parseGameText, validateGame, ALPHABET_EN } from './ai.js';
 import { Game } from './game.js';
 import { Circle } from './circle.js';
 import { Recognizer, recognitionSupported, speak, stopSpeaking, voicesFor, onVoices } from './speech.js';
@@ -306,6 +306,7 @@ function updateCurrentGame() {
   const box = $('current-game');
   if (!box) return;
   const g = state.data;
+  updateAppendPanel(g);
   if (!g) {
     box.className = 'current-game none';
     box.innerHTML = 'No game loaded — pick or create one in <b>2 · Your games</b>.';
@@ -317,6 +318,76 @@ function updateCurrentGame() {
   box.innerHTML =
     `<b>${esc(g.title)}</b>` +
     `<span>${esc(langName)} · ${g.letters.length} letters · ${g.players} player${g.players > 1 ? 's' : ''}</span>`;
+}
+
+// ---------- Add circles (word sets) to the loaded game ----------
+
+const gameSetCount = (g) => Math.max(1, ...g.letters.map((l) => (l.variants ? l.variants.length : 1)));
+
+// Show the "add circles" panel only when a game is loaded; keep its info line
+// and the new-circles input clamped to what still fits (6 players max).
+function updateAppendPanel(g) {
+  const panel = $('append-details');
+  if (!panel) return;
+  panel.classList.toggle('hidden', !g);
+  if (!g) return;
+  const sets = gameSetCount(g);
+  const room = Math.max(0, 6 - sets);
+  $('append-info').textContent =
+    `“${g.title}” has ${sets} circle${sets > 1 ? 's' : ''} of words — one per player. ` +
+    (room ? `You can add up to ${room} more.` : 'It already has the maximum of 6.');
+  const cnt = $('append-count');
+  cnt.max = Math.max(1, room);
+  if (+cnt.value > room) cnt.value = Math.max(1, room);
+  $('append-prompt').disabled = !room;
+  $('append-json').disabled = !room;
+}
+
+function bindAppend() {
+  $('append-prompt').addEventListener('click', () => {
+    const g = state.data;
+    if (!g) return;
+    const langName =
+      [...$('language').options].find((o) => o.value === g.langCode)?.dataset.name || g.language || 'English';
+    const count = Math.max(1, Math.min(6 - gameSetCount(g), +$('append-count').value || 1));
+    $('append-output').value = buildAppendPrompt({
+      language: langName,
+      count,
+      letters: g.letters.map((l) => ({ letter: l.letter, type: l.type, existing: l.variants.map((v) => v.answer) })),
+    });
+  });
+
+  $('copy-append').addEventListener('click', async () => {
+    await navigator.clipboard.writeText($('append-output').value).catch(() => {});
+    flash($('copy-append'), 'Copied!');
+  });
+
+  $('append-json').addEventListener('click', () => {
+    const msg = $('append-msg');
+    const g = state.data;
+    if (!g) return;
+    const parsed = parseGameText($('append-input').value);
+    if (!parsed.ok) {
+      msg.className = 'msg error';
+      msg.textContent = parsed.errors.slice(0, 3).join(' ');
+      return;
+    }
+    const res = appendSets(g, parsed.game.letters);
+    if (!res.ok) {
+      msg.className = 'msg error';
+      msg.textContent = res.errors.join(' ');
+      return;
+    }
+    setPlayerCount(res.total);
+    saveLocal(); // an extended game is worth keeping — updates the library entry
+    updateCurrentGame();
+    pushRemoteState();
+    $('append-input').value = '';
+    msg.className = 'msg ok';
+    msg.textContent =
+      `Added ${res.added} circle${res.added > 1 ? 's' : ''} — “${g.title}” now has ${res.total} word sets.` +
+      (res.duplicates.length ? ` ⚠ Repeats of existing words: ${res.duplicates.slice(0, 6).join(', ')} — press ✏️ to fix.` : '');
+  });
 }
 
 function loadGameText(text, players) {
@@ -1611,6 +1682,7 @@ setupScreen();
 applyPrefs(); // restore the teacher's play settings (games never override them)
 bindGameControls();
 bindEditor();
+bindAppend();
 renderHistory();
 const remoteReady = initRemoteLink(); // resolves once we know whether the neural server is up
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));

@@ -57,6 +57,80 @@ Rules:
 - Output JSON only.`;
 }
 
+// Prompt for ADDING word sets (circles) to an existing game: the AI sees the
+// words already in use per letter so the new sets don't repeat them.
+export function buildAppendPrompt({ language = 'English', count = 1, letters = [] }) {
+  const n = Math.max(1, count);
+  const inUse = letters
+    .map((l) => `${l.letter} (${l.type === 'contains' ? 'contains' : 'starts'}): ${l.existing.join(', ') || '—'}`)
+    .join('\n');
+  return `You are ADDING word sets to an existing "Password" alphabet game for an ESL classroom (one word + clue per letter; each player gets their own word per letter).
+
+Target language: ${language}
+New word sets to create: ${n}
+
+Below, for every letter, are the words ALREADY IN USE. Create exactly ${n} NEW variant(s) per letter — words that are different from each other AND from all the words already in use (not synonyms, translations or plural/derived forms of them). Match the topic and difficulty of the existing words.
+
+Letters and words already in use:
+${inUse}
+
+Return ONLY valid JSON (no markdown, no commentary) with this exact schema:
+
+{
+  "letters": [
+    {
+      "letter": "A",
+      "type": "starts",
+      "variants": [
+        {
+          "answer": "string — the new word, lowercase",
+          "accept": ["optional synonyms / accepted variants, lowercase"],
+          "clue": "string — one-sentence clue in ${language}. Do NOT include the answer word."
+        }
+        // exactly ${n} variant object(s)
+      ]
+    }
+  ]
+}
+
+Rules:
+- One object per letter listed above, in the same order, keeping each letter's "type" as shown.
+- Every answer and clue in ${language}; answers lowercase, single words where possible.
+- Clues must never contain their own answer.
+- Output JSON only.`;
+}
+
+// Merge freshly pasted word sets into an existing (validated) game. `incoming`
+// is the letters array of a validated paste. Mutates `game` only on success.
+export function appendSets(game, incoming) {
+  const map = new Map(incoming.map((l) => [l.letter, l]));
+  const missing = game.letters.filter((l) => !map.has(l.letter)).map((l) => l.letter);
+  if (missing.length) {
+    return { ok: false, errors: [`The pasted JSON is missing letters: ${missing.join(', ')}.`] };
+  }
+  const addCounts = new Set(game.letters.map((l) => map.get(l.letter).variants.length));
+  if (addCounts.size > 1) {
+    return { ok: false, errors: ['Every letter must add the same number of new word sets.'] };
+  }
+  const add = [...addCounts][0];
+  const current = Math.max(...game.letters.map((l) => l.variants.length));
+  if (current + add > 6) {
+    return { ok: false, errors: [`That would make ${current + add} word sets — the game supports at most 6 players.`] };
+  }
+  // New words should be new: flag any that repeat an existing answer (still appended).
+  const duplicates = [];
+  for (const l of game.letters) {
+    for (const v of map.get(l.letter).variants) {
+      if (l.variants.some((x) => x.answer.trim().toLowerCase() === v.answer.trim().toLowerCase())) {
+        duplicates.push(`${l.letter}: ${v.answer}`);
+      }
+    }
+  }
+  game.letters.forEach((l) => l.variants.push(...map.get(l.letter).variants));
+  game.players = current + add;
+  return { ok: true, errors: [], added: add, total: current + add, duplicates };
+}
+
 // The prompt no longer asks the AI for langCode (an app concern); recover the
 // dialect code from the echoed language name instead. Accepts native spellings.
 const LANG_CODES = {

@@ -131,6 +131,9 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 .h-clear { align-self: flex-start; margin-top: 6px; }
 
 .import { margin-top: 8px; }
+.append-row { align-items: flex-end; }
+.append-row label { flex: 0 0 110px; }
+.append-row .btn { margin-bottom: 10px; }
 .import summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 6px 0; list-style: none; }
 .import summary::-webkit-details-marker { display: none; }
 .import summary::before { content: '▸ '; }

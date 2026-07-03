@@ -64,6 +64,20 @@
           </div>
           <input id="file-input" type="file" accept=".txt,.json,text/plain,application/json" hidden />
         </details>
+        <details id="append-details" class="import hidden">
+          <summary>➕ Add circles (word sets) to the loaded game</summary>
+          <p id="append-info" class="hint"></p>
+          <div class="field-row append-row">
+            <label>New circles <input id="append-count" type="number" value="2" min="1" max="5" /></label>
+            <button id="append-prompt" class="btn">Build chatbot prompt</button>
+            <button id="copy-append" class="btn ghost">Copy</button>
+          </div>
+          <textarea id="append-output" class="mono" rows="4" placeholder="A prompt that lists the words already in the game (so the AI picks different ones) appears here."></textarea>
+          <textarea id="append-input" class="mono" rows="4" placeholder="Paste the JSON the chatbot returns here…"></textarea>
+          <button id="append-json" class="btn">➕ Append to game</button>
+          <div id="append-msg" class="msg"></div>
+          <p class="hint">Prefer to write them yourself? Press ✏️ on the game and use “+ player set”.</p>
+        </details>
       </div>
 
       <!-- 3. Settings for playing the loaded game -->
