@@ -131,6 +131,24 @@ export function appendSets(game, incoming) {
   return { ok: true, errors: [], added: add, total: current + add, duplicates };
 }
 
+// Mix the circles for a replay with the same class: per letter, rotate which
+// player gets which word by a random non-zero offset — so every player is
+// GUARANTEED a different word on every letter than last time, while each circle
+// stays a complete alphabet. Mutates the game. Needs at least 2 word sets.
+export function mixSets(game, rand = Math.random) {
+  const sets = Math.max(...game.letters.map((l) => l.variants.length));
+  if (sets < 2) {
+    return { ok: false, errors: ['Mixing needs at least 2 circles of words — this game has only 1.'] };
+  }
+  for (const l of game.letters) {
+    const k = l.variants.length;
+    if (k < 2) continue; // single word for this letter — nothing to mix
+    const off = 1 + Math.floor(rand() * (k - 1)); // never 0: everyone changes word
+    l.variants = l.variants.map((_, i) => l.variants[(i + off) % k]);
+  }
+  return { ok: true, errors: [], sets };
+}
+
 // The prompt no longer asks the AI for langCode (an app concern); recover the
 // dialect code from the echoed language name instead. Accepts native spellings.
 const LANG_CODES = {

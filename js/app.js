@@ -1,5 +1,5 @@
 // app.js — wires the setup screen, game engine, speech, and camera together.
-import { buildPrompt, buildAppendPrompt, appendSets, parseGameText, validateGame, ALPHABET_EN } from './ai.js';
+import { buildPrompt, buildAppendPrompt, appendSets, mixSets, parseGameText, validateGame, ALPHABET_EN } from './ai.js';
 import { Game } from './game.js';
 import { Circle } from './circle.js';
 import { Recognizer, recognitionSupported, speak, stopSpeaking, voicesFor, onVoices } from './speech.js';
@@ -327,6 +327,8 @@ const gameSetCount = (g) => Math.max(1, ...g.letters.map((l) => (l.variants ? l.
 // Show the "add circles" panel only when a game is loaded; keep its info line
 // and the new-circles input clamped to what still fits (6 players max).
 function updateAppendPanel(g) {
+  const mixBtn = $('mix-circles');
+  if (mixBtn) mixBtn.disabled = !g || gameSetCount(g) < 2; // mixing needs 2+ circles
   const panel = $('append-details');
   if (!panel) return;
   panel.classList.toggle('hidden', !g);
@@ -344,6 +346,23 @@ function updateAppendPanel(g) {
 }
 
 function bindAppend() {
+  // Replay with the same class: reshuffle which player gets which word.
+  $('mix-circles').addEventListener('click', () => {
+    const g = state.data;
+    if (!g) return;
+    const v = $('validation');
+    const res = mixSets(g);
+    if (!res.ok) {
+      v.className = 'msg error';
+      v.textContent = res.errors[0];
+      return;
+    }
+    flash($('mix-circles'), 'Mixed!');
+    v.className = 'msg ok';
+    v.textContent = `Circles mixed — all ${res.sets} players get different words than last time. ▶ Start when ready (💾 Save only if you want to keep this arrangement).`;
+    pushRemoteState();
+  });
+
   $('append-prompt').addEventListener('click', () => {
     const g = state.data;
     if (!g) return;
