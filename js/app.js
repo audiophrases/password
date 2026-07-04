@@ -327,8 +327,6 @@ const gameSetCount = (g) => Math.max(1, ...g.letters.map((l) => (l.variants ? l.
 // Show the "add circles" panel only when a game is loaded; keep its info line
 // and the new-circles input clamped to what still fits (6 players max).
 function updateAppendPanel(g) {
-  const mixBtn = $('mix-circles');
-  if (mixBtn) mixBtn.disabled = !g || gameSetCount(g) < 2; // mixing needs 2+ circles
   const panel = $('append-details');
   if (!panel) return;
   panel.classList.toggle('hidden', !g);
@@ -346,23 +344,6 @@ function updateAppendPanel(g) {
 }
 
 function bindAppend() {
-  // Replay with the same class: reshuffle which player gets which word.
-  $('mix-circles').addEventListener('click', () => {
-    const g = state.data;
-    if (!g) return;
-    const v = $('validation');
-    const res = mixSets(g);
-    if (!res.ok) {
-      v.className = 'msg error';
-      v.textContent = res.errors[0];
-      return;
-    }
-    flash($('mix-circles'), 'Mixed!');
-    v.className = 'msg ok';
-    v.textContent = `Circles mixed — each of the ${res.sets} circles is now a random blend of the old ones, letter by letter. ▶ Start when ready (💾 Save only if you want to keep this arrangement).`;
-    pushRemoteState();
-  });
-
   $('append-prompt').addEventListener('click', () => {
     const g = state.data;
     if (!g) return;
@@ -497,6 +478,7 @@ function updateSetLabel() {
   const lbl = $('editor-set-label');
   if (lbl) lbl.textContent = `${state.edit.set + 1} / ${state.edit.sets}`;
   if ($('editor-set-del')) $('editor-set-del').disabled = state.edit.sets <= 1;
+  if ($('editor-mix')) $('editor-mix').disabled = state.edit.sets < 2; // nothing to mix with one set
 }
 
 function setEditorSet(index) {
@@ -923,6 +905,27 @@ function bindEditor() {
   $('editor-set-next').addEventListener('click', () => setEditorSet(state.edit.set + 1));
   $('editor-set-add').addEventListener('click', addSet);
   $('editor-set-del').addEventListener('click', removeSet);
+  // Blend the word sets letter by letter (see mixSets). Operates on the editor's
+  // in-memory rows, so the teacher can rename the title and save the mix as a
+  // NEW game without touching the original.
+  $('editor-mix').addEventListener('click', () => {
+    const msg = $('editor-msg');
+    stashVisibleSet(); // capture in-progress edits before shuffling
+    const rows = [...$('editor-rows').querySelectorAll('.erow')];
+    const res = rows.length
+      ? mixSets({ letters: rows.map((r) => ({ variants: r._variants })) }) // swaps in place
+      : { ok: false, errors: ['Add some letters first.'] };
+    if (!res.ok) {
+      msg.className = 'msg error';
+      msg.textContent = res.errors[0];
+      return;
+    }
+    rows.forEach((r) => applyVariantToRow(r, state.edit.set));
+    flash($('editor-mix'), 'Mixed!');
+    msg.className = 'msg ok';
+    msg.textContent =
+      'Circles mixed — every set is now a random blend of the old ones. Rename the title before 💾 Save to keep the original game unchanged.';
+  });
   $('editor-save').addEventListener('click', () => {
     if (saveEditorData()) {
       saveLocal(); // saving also stores it in this browser
