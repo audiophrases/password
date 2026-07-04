@@ -254,15 +254,30 @@ function setupScreen() {
   populateVoices($('language').value);
   onVoices(() => populateVoices($('language').value)); // re-list once Edge's natural voices load
 
+  // Each game type suggests its own topic; swap the suggestion only while the
+  // teacher hasn't typed a custom one.
+  const TOPIC_DEFAULTS = {
+    vocabulary: 'everyday vocabulary',
+    quiz: 'people, places, history and science',
+    subject: 'natural science (Medi), 4th grade',
+  };
+  $('purpose').addEventListener('change', () => {
+    const t = $('topic');
+    if (!t.value.trim() || Object.values(TOPIC_DEFAULTS).includes(t.value.trim())) {
+      t.value = TOPIC_DEFAULTS[$('purpose').value] || '';
+    }
+  });
+
   $('build-prompt').addEventListener('click', () => {
     const opt = $('prompt-lang').selectedOptions[0];
     const letters = ($('letters').value || ALPHABET_EN.join('')).toUpperCase().replace(/[^A-ZÑ]/g, '').split('');
     const prompt = buildPrompt({
       language: opt.dataset.name,
       level: $('level').value,
-      topic: $('topic').value.trim() || 'everyday vocabulary',
+      topic: $('topic').value.trim() || TOPIC_DEFAULTS[$('purpose').value] || 'everyday vocabulary',
       letters: letters.length ? letters : ALPHABET_EN,
       players: state.players.length,
+      purpose: $('purpose').value,
     });
     $('prompt-output').value = prompt;
   });

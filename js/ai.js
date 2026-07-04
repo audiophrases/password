@@ -3,23 +3,51 @@
 
 export const ALPHABET_EN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+// What kind of round is being generated — each use case gets its own framing,
+// clue style and answer rule, while the JSON schema stays identical.
+const PURPOSES = {
+  vocabulary: {
+    intro: (language) =>
+      `an alphabet word game played in class by school students learning ${language} as a foreign language. There is one word and clue per letter of the alphabet; the player guesses each word from its clue.`,
+    clue: (language, level) => `a one-sentence definition-style clue at ${level} level`,
+    rule: (language, level) =>
+      `Answers are common ${language} vocabulary words (no proper nouns); clues are simple definitions solvable at ${level}.`,
+  },
+  quiz: {
+    intro: (language) =>
+      `a general-knowledge quiz in ${language}, played in class as an alphabet game. Each letter has an answer — a person, place, event, work or concept — and the player names it from a short factual clue.`,
+    clue: (language, level) => `a one-sentence factual clue (who/what/where), in simple ${level}-level ${language}`,
+    rule: (language, level) =>
+      `Answers may be proper nouns (people, places, works, events) or common nouns — real general-knowledge material, not vocabulary practice; clues are factual hints in simple ${level}-level ${language}.`,
+  },
+  subject: {
+    intro: (language) =>
+      `a school revision game in ${language} for the subject given below, played as an alphabet quiz. Each letter has a key term from the subject; the player names it from a short clue.`,
+    clue: (language, level) => `a one-sentence clue that quizzes the concept, in simple ${level}-level ${language}`,
+    rule: (language, level) =>
+      `Answers are key terms, names and concepts from the subject/curriculum below; clues test understanding of the material, phrased in simple ${level}-level ${language}.`,
+  },
+};
+
 export function buildPrompt({
   language = 'English',
   level = 'A2',
   topic = 'everyday vocabulary',
   letters = ALPHABET_EN,
   players = 1,
+  purpose = 'vocabulary',
 }) {
   const letterList = letters.join(', ');
   const n = Math.max(1, players);
+  const p = PURPOSES[purpose] || PURPOSES.vocabulary;
   const variantsRule =
     n > 1
       ? `Provide exactly ${n} "variants" per letter — a DIFFERENT word (with its own clue) for each player. The players are in the same classroom and hear each other answer, so no two players may get the same word for a given letter; make the variants genuinely different words, not synonyms or plurals of one another.`
       : `Provide exactly 1 "variant" per letter.`;
-  return `You are creating word lists for "Password", an alphabet word game played in class by school students learning ${language} as a foreign language. There is one word and clue per letter of the alphabet; the player guesses each word from its clue.
+  return `You are creating word lists for "Password", ${p.intro(language)}
 
-Target language: ${language}
-Level (CEFR): ${level}
+Language: ${language}
+Level (CEFR, for the clue language): ${level}
 Topic / theme: ${topic}
 Letters to include: ${letterList}
 Players: ${n}
@@ -36,9 +64,9 @@ Return ONLY valid JSON (no markdown, no commentary) matching this exact schema:
       "type": "starts",            // "starts" (word begins with the letter) or "contains" (letter appears in it)
       "variants": [
         {
-          "answer": "string — the target word, lowercase",
+          "answer": "string — the target answer, lowercase",
           "accept": ["optional synonyms / accepted variants, lowercase"],
-          "clue": "string — a one-sentence clue at ${level} level. Do NOT include the answer word."
+          "clue": "string — ${p.clue(language, level)}. Do NOT include the answer word."
         }
         // exactly ${n} variant object(s), one per player
       ]
@@ -47,13 +75,14 @@ Return ONLY valid JSON (no markdown, no commentary) matching this exact schema:
 }
 
 Rules:
-- Write every answer and clue in ${language} (the target language).
+- Write every answer and clue in ${language}.
+- ${p.rule(language, level)}
 - One letter object per letter listed above, in that order.
 - ${variantsRule}
 - All variants of a letter share the same "letter" and "type".
-- Prefer "starts" for the letter; only use "contains" when no good ${level} word fits (then end each clue with "(contains <LETTER>)").
+- Prefer "starts" for the letter; only use "contains" when no good answer fits (then end each clue with "(contains <LETTER>)").
 - Keep answers to a single word where possible, lowercase, no punctuation.
-- Clues must be solvable at ${level} and must never contain their own answer.
+- Clues must never contain their own answer.
 - Output JSON only.`;
 }
 
@@ -64,12 +93,12 @@ export function buildAppendPrompt({ language = 'English', count = 1, letters = [
   const inUse = letters
     .map((l) => `${l.letter} (${l.type === 'contains' ? 'contains' : 'starts'}): ${l.existing.join(', ') || '—'}`)
     .join('\n');
-  return `You are ADDING word sets to an existing "Password" alphabet game played in class by school students learning ${language} as a foreign language (one word + clue per letter; each player gets their own word per letter).
+  return `You are ADDING word sets to an existing "Password" alphabet game played in class, in ${language} (one answer + clue per letter; each player gets their own answer per letter). The words already in the game show you what kind of round it is — vocabulary practice, general-knowledge quiz, school subject revision, etc.
 
-Target language: ${language}
+Language: ${language}
 New word sets to create: ${n}
 
-Below, for every letter, are the words ALREADY IN USE. Create exactly ${n} NEW variant(s) per letter — words that are different from each other AND from all the words already in use (not synonyms, translations or plural/derived forms of them). Match the topic and difficulty of the existing words.
+Below, for every letter, are the words ALREADY IN USE. Create exactly ${n} NEW variant(s) per letter — answers that are different from each other AND from all the words already in use (not synonyms, translations or plural/derived forms of them). Match the kind of content, topic and difficulty of the existing words: if they are famous people and places, add more famous people and places; if they are everyday vocabulary, add everyday vocabulary.
 
 Letters and words already in use:
 ${inUse}

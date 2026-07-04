@@ -37,6 +37,13 @@
           </label>
           <label>Players <input id="num-players" type="number" value="1" min="1" max="6" /></label>
         </div>
+        <label>Game type
+          <select id="purpose">
+            <option value="vocabulary" selected>Vocabulary (language learning)</option>
+            <option value="quiz">General knowledge quiz</option>
+            <option value="subject">School subject review</option>
+          </select>
+        </label>
         <label>Topic / theme <input id="topic" type="text" value="everyday vocabulary" /></label>
         <label>Letters <input id="letters" type="text" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" /></label>
         <button id="build-prompt" class="btn">Build chatbot prompt</button>
