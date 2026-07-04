@@ -16,7 +16,7 @@ export function buildPrompt({
     n > 1
       ? `Provide exactly ${n} "variants" per letter — a DIFFERENT word (with its own clue) for each player. The players are in the same classroom and hear each other answer, so no two players may get the same word for a given letter; make the variants genuinely different words, not synonyms or plurals of one another.`
       : `Provide exactly 1 "variant" per letter.`;
-  return `You are creating word lists for "Password", an alphabet word game for an ESL classroom. There is one word and clue per letter of the alphabet; the player guesses each word from its clue.
+  return `You are creating word lists for "Password", an alphabet word game played in class by school students learning ${language} as a foreign language. There is one word and clue per letter of the alphabet; the player guesses each word from its clue.
 
 Target language: ${language}
 Level (CEFR): ${level}
@@ -64,7 +64,7 @@ export function buildAppendPrompt({ language = 'English', count = 1, letters = [
   const inUse = letters
     .map((l) => `${l.letter} (${l.type === 'contains' ? 'contains' : 'starts'}): ${l.existing.join(', ') || '—'}`)
     .join('\n');
-  return `You are ADDING word sets to an existing "Password" alphabet game for an ESL classroom (one word + clue per letter; each player gets their own word per letter).
+  return `You are ADDING word sets to an existing "Password" alphabet game played in class by school students learning ${language} as a foreign language (one word + clue per letter; each player gets their own word per letter).
 
 Target language: ${language}
 New word sets to create: ${n}
