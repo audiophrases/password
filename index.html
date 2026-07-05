@@ -89,60 +89,68 @@
 
       <!-- 3. Settings for playing the loaded game -->
       <div class="card">
-        <h2>3 · Play settings</h2>
-        <p class="hint card-note"><b>Yours, not the game's</b>: how any game is judged, timed and read aloud. Remembered on this laptop; loading a game never changes them. Push changes to a running game with ⚡ Apply.</p>
+        <h2>3 · Play &amp; settings</h2>
 
-        <label>Game language
-          <select id="language">
-            <option value="en-US" data-name="English" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" selected>English</option>
-            <option value="ca-ES" data-name="Catalan" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Catalan</option>
-            <option value="fr-FR" data-name="French" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">French</option>
-            <option value="es-ES" data-name="Spanish" data-letters="ABCDEFGHIJKLMNÑOPQRSTUVWXYZ">Spanish</option>
-          </select>
-        </label>
-        <p class="hint">Reflects the loaded game and sets the read-aloud voice &amp; speech recognition. Independent of the prompt language in section 1.</p>
-
-        <div class="group-label">Players <span class="hint">count comes from section 1 or the loaded game</span></div>
-        <div id="players-list"></div>
-
-        <div class="group-label">Judging</div>
-        <label>Judging mode
-          <select id="mode">
-            <option value="voice-assist">Voice-assist (ASR suggests, you confirm)</option>
-            <option value="voice-auto" selected>Voice-auto (auto-accept confident answers)</option>
-            <option value="teacher-judge">Teacher-judge (no mic, you decide)</option>
-            <option value="type-in">Type-in (typed answers)</option>
-          </select>
-        </label>
-        <label class="slider">Strictness <input id="strictness" type="range" min="0" max="1" step="0.05" value="0.7" />
-          <output id="strictness-out">0.7</output>
-        </label>
-        <label>Time limit (seconds per player, 0 = no timer)
-          <input id="play-duration" type="number" value="300" min="0" max="3600" step="10" />
-        </label>
-
-        <div class="group-label">Read-aloud <span class="hint">voice follows the game's language</span></div>
-        <label>Voice
-          <span class="voice-pick">
-            <select id="voice"></select>
-            <button id="test-voice" class="btn ghost small" type="button" title="Test voice">▶</button>
-          </span>
-        </label>
-        <label class="check"><input id="neural" type="checkbox" disabled /> High-quality neural voice (uses the server)</label>
-        <div id="neural-note" class="hint"></div>
-        <label class="slider">Reading speed <input id="tts-rate" type="range" min="0.5" max="1.5" step="0.01" value="0.93" />
-          <input id="tts-rate-num" class="num" type="number" min="0.5" max="1.5" step="0.01" value="0.93" title="Type an exact speed, e.g. 0.89" />
-        </label>
-        <label class="check"><input id="auto-read" type="checkbox" checked /> Read clues aloud automatically</label>
-        <p id="speech-note" class="hint"></p>
-
-        <hr />
-        <div id="remote-info" class="hint remote-info"></div>
-        <div id="remote-qr" class="remote-qr"></div>
         <div id="current-game" class="current-game none">No game loaded — pick or create one in <b>2 · Your games</b>.</div>
         <button id="start-game" class="btn primary" disabled>▶ Start game (new tab)</button>
-        <p class="hint">Opens the game in a new tab — project that one and keep this tab as your control panel.</p>
+        <p class="hint">Opens in a new tab — project that one, keep this tab as your control panel.</p>
         <button id="apply-live" class="btn hidden">⚡ Apply settings to the live game</button>
+
+        <p class="hint card-note">Settings are <b>yours, not the game's</b> — remembered on this laptop, never changed by loading a game.</p>
+
+        <details class="sgroup">
+          <summary>Players <span class="hint">names &amp; game language</span></summary>
+          <div id="players-list"></div>
+          <label>Game language
+            <select id="language" title="Set from the loaded game; drives the read-aloud voice and speech recognition.">
+              <option value="en-US" data-name="English" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" selected>English</option>
+              <option value="ca-ES" data-name="Catalan" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Catalan</option>
+              <option value="fr-FR" data-name="French" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">French</option>
+              <option value="es-ES" data-name="Spanish" data-letters="ABCDEFGHIJKLMNÑOPQRSTUVWXYZ">Spanish</option>
+            </select>
+          </label>
+        </details>
+
+        <details class="sgroup">
+          <summary>Judging &amp; time</summary>
+          <label>Judging mode
+            <select id="mode">
+              <option value="voice-assist">Voice-assist (ASR suggests, you confirm)</option>
+              <option value="voice-auto" selected>Voice-auto (auto-accept confident answers)</option>
+              <option value="teacher-judge">Teacher-judge (no mic, you decide)</option>
+              <option value="type-in">Type-in (typed answers)</option>
+            </select>
+          </label>
+          <label class="slider">Strictness <input id="strictness" type="range" min="0" max="1" step="0.05" value="0.7" />
+            <output id="strictness-out">0.7</output>
+          </label>
+          <label>Time limit (seconds per player, 0 = no timer)
+            <input id="play-duration" type="number" value="300" min="0" max="3600" step="10" />
+          </label>
+        </details>
+
+        <details class="sgroup">
+          <summary>Read-aloud <span class="hint">voice follows the game's language</span></summary>
+          <label>Voice
+            <span class="voice-pick">
+              <select id="voice"></select>
+              <button id="test-voice" class="btn ghost small" type="button" title="Test voice">▶</button>
+            </span>
+          </label>
+          <label class="check"><input id="neural" type="checkbox" disabled /> High-quality neural voice (uses the server)</label>
+          <div id="neural-note" class="hint"></div>
+          <label class="slider">Reading speed <input id="tts-rate" type="range" min="0.5" max="1.5" step="0.01" value="0.93" />
+            <input id="tts-rate-num" class="num" type="number" min="0.5" max="1.5" step="0.01" value="0.93" title="Type an exact speed, e.g. 0.89" />
+          </label>
+          <label class="check"><input id="auto-read" type="checkbox" checked /> Read clues aloud automatically</label>
+          <p id="speech-note" class="hint"></p>
+        </details>
+
+        <details class="sgroup" open>
+          <summary>📱 Phone remote</summary>
+          <div id="remote-info" class="hint remote-info"></div>
+          <div id="remote-qr" class="remote-qr"></div>
+        </details>
       </div>
 
       <!-- 4. Results history & review -->
@@ -209,6 +217,7 @@
 
     <div id="heard" class="heard"></div>
     <div id="suggestion" class="suggestion"></div>
+    <div id="reveal-answer" class="reveal-answer hidden"></div>
     <div id="toast" class="toast hidden"></div>
 
     <div id="controls">

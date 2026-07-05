@@ -29,6 +29,7 @@ export class Game extends EventTarget {
     this.passMs = 700; // shorter hold for a pass (yellow) before switching
     this._revealing = false;
     this._revealTimer = null;
+    this.lastResolved = null; // { letter, playerIndex, state } of the latest judged answer
   }
 
   get active() {
@@ -114,6 +115,9 @@ export class Game extends EventTarget {
     this.ended = true;
     this.running = false;
     clearInterval(this._timer);
+    // Final repaint BEFORE the results: the last letter must show its real state
+    // (red for wrong, white for timed-out) instead of staying active-green.
+    this.emit('update');
     this.emit('end');
   }
 
@@ -128,15 +132,16 @@ export class Game extends EventTarget {
   }
 
   // Hold the just-marked result on screen for `revealMs`, then hand the turn on.
-  // If nobody else is waiting (single player or everyone else done), advance now.
-  _handOver(p, revealMs, finishing) {
+  // Without `always`, the hold only happens when another player is waiting;
+  // `always` forces it (used for wrong answers, whose reveal shows the answer).
+  _handOver(p, revealMs, finishing, always = false) {
     const advance = () => {
       if (finishing) this._finishPlayer(p); // marks done, then rotates or ends
       else this._rotate();
       if (!this.ended) this.emit('update');
     };
     const willSwitch = this.players.some((x, i) => i !== this.activeIndex && !x.done);
-    if (!willSwitch) {
+    if (!willSwitch && !always) {
       advance();
       return;
     }
@@ -156,28 +161,32 @@ export class Game extends EventTarget {
     const letter = this.currentLetter;
     if (!letter || p.done || this._revealing) return;
     p.results[letter] = 'correct';
+    this.lastResolved = { letter, playerIndex: this.activeIndex, state: 'correct' };
     p.queue.shift();
     if (p.queue.length === 0) this._finishPlayer(p); // cleared the whole board this turn
     if (!this.ended) this.emit('update');
   }
 
-  // Wrong: mark it and hand the turn on after the (longer) red reveal.
+  // Wrong: always hold the red reveal (the app shows the correct answer during
+  // it — even in single player), then hand the turn on.
   wrong() {
     const p = this.active;
     const letter = this.currentLetter;
     if (!letter || p.done || this._revealing) return;
     p.results[letter] = 'wrong';
+    this.lastResolved = { letter, playerIndex: this.activeIndex, state: 'wrong' };
     p.queue.shift();
-    this._handOver(p, this.revealMs, p.queue.length === 0);
+    this._handOver(p, this.revealMs, p.queue.length === 0, true);
   }
 
   // Pass: requeue this letter at the back (no penalty) and hand the turn on after
-  // a shorter yellow reveal.
+  // a shorter yellow reveal (no answer shown — the letter comes back later).
   pass() {
     const p = this.active;
     const letter = this.currentLetter;
     if (!letter || p.done || this._revealing) return;
     if (p.results[letter] === 'pending') p.results[letter] = 'passed';
+    this.lastResolved = { letter, playerIndex: this.activeIndex, state: 'passed' };
     p.queue.push(p.queue.shift());
     this._handOver(p, this.passMs, false);
   }

@@ -60,12 +60,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border-left: 3px solid color-mix(in srgb, var(--ok) 45%, var(--line));
   border-radius: 6px; padding: 8px 10px; margin: -2px 0 14px; line-height: 1.45;
 }
-/* Sub-group heading inside a card (e.g. Judging, Read-aloud). */
-.group-label {
+/* Collapsible settings group inside a card (Players, Judging, Read-aloud…). */
+.sgroup { border-top: 1px solid var(--line); padding: 10px 0 6px; }
+.sgroup summary {
+  cursor: pointer; list-style: none;
   font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
-  color: var(--ink); margin: 16px 0 6px; display: flex; align-items: baseline; gap: 8px;
+  color: var(--ink); display: flex; align-items: baseline; gap: 8px;
 }
-.group-label .hint { margin: 0; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.sgroup summary::-webkit-details-marker { display: none; }
+.sgroup summary::before { content: '▸'; color: var(--muted); }
+.sgroup[open] summary::before { content: '▾'; }
+.sgroup[open] summary { margin-bottom: 10px; }
+.sgroup summary .hint { margin: 0; text-transform: none; letter-spacing: 0; font-weight: 400; }
 
 label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
 input[type=text], input[type=number], select, textarea {
@@ -314,6 +320,17 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
 .ctrl.mic.live { background: var(--no); border-color: var(--no); color: #fff; }
 .ctrl.util { font-size: 13px; color: var(--muted); }
 .type-answer { width: 150px; margin: 0; }
+
+/* wrong-answer reveal: flashes the correct answer while the red chip is held */
+.reveal-answer {
+  position: absolute; top: 24%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  background: var(--no); color: #fff; border-radius: 16px;
+  padding: 14px 30px; z-index: 7;
+  font-size: clamp(26px, 4.5vmin, 44px); font-weight: 800;
+  box-shadow: 0 8px 30px rgba(20, 35, 59, .3);
+}
+.reveal-answer small { font-size: .38em; font-weight: 700; opacity: .85; text-transform: uppercase; letter-spacing: 1px; }
 
 /* live-settings confirmation toast */
 .toast {

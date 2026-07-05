@@ -1388,6 +1388,7 @@ function renderBoard() {
   $('suggestion').className = 'suggestion';
   $('suggestion').textContent = '';
   $('heard').textContent = '';
+  $('reveal-answer').classList.add('hidden'); // answer banner lives only during a wrong-reveal
 }
 
 function render() {
@@ -1400,6 +1401,17 @@ function render() {
 function renderReveal() {
   stopNarration();
   renderBoard();
+  // A wrong answer flashes the correct one while the red chip is held on screen
+  // (passes don't — that letter comes back around later).
+  const lr = state.game.lastResolved;
+  if (lr && lr.state === 'wrong') {
+    const e = state.game.entryFor(lr.playerIndex, lr.letter);
+    if (e) {
+      const banner = $('reveal-answer');
+      banner.innerHTML = `<small>${esc(lr.letter)} was</small>${esc(e.answer)}`;
+      banner.classList.remove('hidden');
+    }
+  }
 }
 
 function renderHud() {
