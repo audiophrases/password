@@ -17,9 +17,9 @@
 
     <div class="setup-grid">
       <!-- 1. Generate words via any chatbot -->
-      <div class="card">
-        <h2>1 · Draft words with AI</h2>
-        <p class="hint card-note">Builds a prompt to paste into ChatGPT / Claude / any chatbot. These fields only shape that prompt — they don't change a game you've already loaded.</p>
+      <details class="card cardfold">
+        <summary><h2>1 · Draft words with AI</h2><span class="hint">new round via ChatGPT / Claude / any chatbot</span></summary>
+        <p class="hint card-note">These fields only shape the prompt — they never change a game you've already loaded.</p>
         <div class="field-row">
           <label>Language
             <select id="prompt-lang">
@@ -49,12 +49,12 @@
         <button id="build-prompt" class="btn">Build chatbot prompt</button>
         <textarea id="prompt-output" class="mono" rows="5" placeholder="Your prompt appears here — paste it into ChatGPT / Claude / any chatbot."></textarea>
         <button id="copy-prompt" class="btn ghost">Copy prompt</button>
-      </div>
+      </details>
 
       <!-- 2. Your games (saved in this browser) -->
       <div class="card">
         <h2>2 · Your games</h2>
-        <p class="hint card-note">A game is its <b>content</b>: language, letters, words &amp; clues (one word set per player). Press ✏️ to edit. Paste chatbot JSON under “Import”.</p>
+        <p class="hint card-note">A game is its <b>content</b> — words, language, letters. ✏️ edit · 🗑 delete · import &amp; add circles below.</p>
         <div id="library" class="library"></div>
         <div class="field-row">
           <button id="edit-game" class="btn">✏️ New game</button>
@@ -154,11 +154,11 @@
       </div>
 
       <!-- 4. Results history & review -->
-      <div class="card">
-        <h2>4 · History &amp; review</h2>
-        <p class="hint card-note">Every round is saved on this laptop. Open a session to see each player's missed words (hover for the clue) — or turn them into a fresh <b>review round</b> with one click.</p>
+      <details class="card cardfold">
+        <summary><h2>4 · History &amp; review</h2><span class="hint" id="history-hint">collects automatically</span></summary>
+        <p class="hint card-note">Open a session to see each player's missed words (hover for the clue) — or turn them into a fresh <b>review round</b> with one click.</p>
         <div id="history" class="history"></div>
-      </div>
+      </details>
     </div>
     <footer class="legend">Keys in game: <b>C</b> correct · <b>W</b> wrong · <b>Space</b> pass · hold <b>V</b> to talk · <b>Enter</b> confirm · <b>H</b> hide text · <b>F</b> fullscreen · <b>P</b> pause</footer>
   </section>

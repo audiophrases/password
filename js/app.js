@@ -833,6 +833,9 @@ function renderHistory() {
   const box = $('history');
   if (!box) return;
   const history = loadHistory();
+  // the collapsed card's summary shows how much is inside
+  const hint = $('history-hint');
+  if (hint) hint.textContent = history.length ? `${history.length} round${history.length > 1 ? 's' : ''} recorded` : 'collects automatically';
   box.innerHTML = '';
   if (!history.length) {
     box.innerHTML = '<p class="lib-empty">No rounds played yet — results will collect here automatically.</p>';

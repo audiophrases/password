@@ -50,9 +50,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   display: grid; gap: 18px; padding: 18px 24px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   max-width: 1200px; margin: 0 auto;
+  align-items: start; /* collapsed cards keep their natural height */
 }
 .card { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); }
 .card h2 { margin: 0 0 12px; font-size: 17px; }
+/* A whole card that folds shut (occasional-use sections: AI drafting, history). */
+details.cardfold > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; }
+details.cardfold > summary::-webkit-details-marker { display: none; }
+details.cardfold > summary::before { content: '▸'; color: var(--muted); }
+details.cardfold[open] > summary::before { content: '▾'; }
+details.cardfold > summary h2 { margin: 0; }
+details.cardfold > summary .hint { margin: 0; }
+details.cardfold[open] > summary { margin-bottom: 12px; }
 .card hr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
 /* "What this section does" note under each card title. */
 .card-note {
