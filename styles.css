@@ -53,6 +53,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   align-items: start; /* collapsed cards keep their natural height */
 }
 .card { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); }
+/* a grid cell holding two stacked cards (column 3: AI drafting + history) */
+.setup-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .card h2 { margin: 0 0 12px; font-size: 17px; }
 /* A whole card that folds shut (occasional-use sections: AI drafting, history). */
 details.cardfold > summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; }

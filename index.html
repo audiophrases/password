@@ -16,44 +16,9 @@
     </header>
 
     <div class="setup-grid">
-      <!-- 1. Generate words via any chatbot -->
-      <details class="card cardfold">
-        <summary><h2>1 · Draft words with AI</h2><span class="hint">new round via ChatGPT / Claude / any chatbot</span></summary>
-        <p class="hint card-note">These fields only shape the prompt — they never change a game you've already loaded.</p>
-        <div class="field-row">
-          <label>Language
-            <select id="prompt-lang">
-              <option value="en-US" data-name="English" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" selected>English</option>
-              <option value="ca-ES" data-name="Catalan" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Catalan</option>
-              <option value="fr-FR" data-name="French" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">French</option>
-              <option value="es-ES" data-name="Spanish" data-letters="ABCDEFGHIJKLMNÑOPQRSTUVWXYZ">Spanish</option>
-            </select>
-          </label>
-          <label>Level
-            <select id="level">
-              <option>A1</option><option selected>A2</option><option>B1</option>
-              <option>B2</option><option>C1</option>
-            </select>
-          </label>
-          <label>Players <input id="num-players" type="number" value="1" min="1" max="6" /></label>
-        </div>
-        <label>Game type
-          <select id="purpose">
-            <option value="vocabulary" selected>Vocabulary (language learning)</option>
-            <option value="quiz">General knowledge quiz</option>
-            <option value="subject">School subject review</option>
-          </select>
-        </label>
-        <label>Topic / theme <input id="topic" type="text" value="everyday vocabulary" /></label>
-        <label>Letters <input id="letters" type="text" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" /></label>
-        <button id="build-prompt" class="btn">Build chatbot prompt</button>
-        <textarea id="prompt-output" class="mono" rows="5" placeholder="Your prompt appears here — paste it into ChatGPT / Claude / any chatbot."></textarea>
-        <button id="copy-prompt" class="btn ghost">Copy prompt</button>
-      </details>
-
-      <!-- 2. Your games (saved in this browser) -->
+      <!-- 1. Your games (saved in this browser) -->
       <div class="card">
-        <h2>2 · Your games</h2>
+        <h2>1 · Your games</h2>
         <p class="hint card-note">A game is its <b>content</b> — words, language, letters. ✏️ edit · 🗑 delete · import &amp; add circles below.</p>
         <div id="library" class="library"></div>
         <div class="field-row">
@@ -87,11 +52,11 @@
         </details>
       </div>
 
-      <!-- 3. Settings for playing the loaded game -->
+      <!-- 2. Settings for playing the loaded game -->
       <div class="card">
-        <h2>3 · Play &amp; settings</h2>
+        <h2>2 · Play &amp; settings</h2>
 
-        <div id="current-game" class="current-game none">No game loaded — pick or create one in <b>2 · Your games</b>.</div>
+        <div id="current-game" class="current-game none">No game loaded — pick or create one in <b>1 · Your games</b>.</div>
         <button id="start-game" class="btn primary" disabled>▶ Start game (new tab)</button>
         <p class="hint">Opens in a new tab — project that one, keep this tab as your control panel.</p>
         <button id="apply-live" class="btn hidden">⚡ Apply settings to the live game</button>
@@ -153,12 +118,50 @@
         </details>
       </div>
 
-      <!-- 4. Results history & review -->
-      <details class="card cardfold">
-        <summary><h2>4 · History &amp; review</h2><span class="hint" id="history-hint">collects automatically</span></summary>
-        <p class="hint card-note">Open a session to see each player's missed words (hover for the clue) — or turn them into a fresh <b>review round</b> with one click.</p>
-        <div id="history" class="history"></div>
-      </details>
+      <!-- Column 3: the occasional-use tools, stacked. -->
+      <div class="setup-col">
+        <!-- 3. Generate words via any chatbot -->
+        <details class="card cardfold">
+          <summary><h2>3 · Draft words with AI</h2><span class="hint">new round via ChatGPT / Claude / any chatbot</span></summary>
+          <p class="hint card-note">These fields only shape the prompt — they never change a game you've already loaded.</p>
+          <div class="field-row">
+            <label>Language
+              <select id="prompt-lang">
+                <option value="en-US" data-name="English" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ" selected>English</option>
+                <option value="ca-ES" data-name="Catalan" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">Catalan</option>
+                <option value="fr-FR" data-name="French" data-letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ">French</option>
+                <option value="es-ES" data-name="Spanish" data-letters="ABCDEFGHIJKLMNÑOPQRSTUVWXYZ">Spanish</option>
+              </select>
+            </label>
+            <label>Level
+              <select id="level">
+                <option>A1</option><option selected>A2</option><option>B1</option>
+                <option>B2</option><option>C1</option>
+              </select>
+            </label>
+            <label>Players <input id="num-players" type="number" value="1" min="1" max="6" /></label>
+          </div>
+          <label>Game type
+            <select id="purpose">
+              <option value="vocabulary" selected>Vocabulary (language learning)</option>
+              <option value="quiz">General knowledge quiz</option>
+              <option value="subject">School subject review</option>
+            </select>
+          </label>
+          <label>Topic / theme <input id="topic" type="text" value="everyday vocabulary" /></label>
+          <label>Letters <input id="letters" type="text" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" /></label>
+          <button id="build-prompt" class="btn">Build chatbot prompt</button>
+          <textarea id="prompt-output" class="mono" rows="5" placeholder="Your prompt appears here — paste it into ChatGPT / Claude / any chatbot."></textarea>
+          <button id="copy-prompt" class="btn ghost">Copy prompt</button>
+        </details>
+
+        <!-- 4. Results history & review -->
+        <details class="card cardfold">
+          <summary><h2>4 · History &amp; review</h2><span class="hint" id="history-hint">collects automatically</span></summary>
+          <p class="hint card-note">Open a session to see each player's missed words (hover for the clue) — or turn them into a fresh <b>review round</b> with one click.</p>
+          <div id="history" class="history"></div>
+        </details>
+      </div>
     </div>
     <footer class="legend">Keys in game: <b>C</b> correct · <b>W</b> wrong · <b>Space</b> pass · hold <b>V</b> to talk · <b>Enter</b> confirm · <b>H</b> hide text · <b>F</b> fullscreen · <b>P</b> pause</footer>
   </section>

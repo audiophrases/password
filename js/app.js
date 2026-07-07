@@ -324,7 +324,7 @@ function updateCurrentGame() {
   updateAppendPanel(g);
   if (!g) {
     box.className = 'current-game none';
-    box.innerHTML = 'No game loaded — pick or create one in <b>2 · Your games</b>.';
+    box.innerHTML = 'No game loaded — pick or create one in <b>1 · Your games</b>.';
     return;
   }
   const langName =
