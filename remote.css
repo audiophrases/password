@@ -35,13 +35,13 @@ body.offline .status::before { content: 'Reconnecting… '; }
 .ctx-letter { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
 #r-letter { font-size: 30px; font-weight: 800; color: var(--ok); }
 #r-kind { color: var(--muted); font-size: 12px; }
-.ctx-clue { margin: 6px 0 0; font-size: 20px; line-height: 1.3; }
+.ctx-clue { margin: 6px 0 0; font-size: 23px; line-height: 1.3; }
 .ctx-answer { margin-top: 10px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
 .ctx-answer b { color: var(--ok); font-size: 24px; text-transform: none; letter-spacing: 0; margin-left: 8px; }
 .r-accept { color: var(--muted); font-size: 13px; text-transform: none; letter-spacing: 0; }
 .ctx-sugg { margin-top: 6px; font-weight: 700; font-size: 14px; color: var(--muted); min-height: 18px; }
 
-.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 38vh; }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex: 1; min-height: 32vh; }
 .big {
   border: none; border-radius: 18px; color: #fff; font-size: 46px; font-weight: 800;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
@@ -53,13 +53,26 @@ body.offline .status::before { content: 'Reconnecting… '; }
 .big.no { background: var(--no); }
 .big.pass { background: var(--pass); color: #1c1300; }
 
-/* Primary read-aloud button — the big prominent control. */
+/* Primary read-aloud button — the big prominent control — plus the mute toggle
+   beside it (auto-read off, so the teacher can read the clues live). */
+.cluerow { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .clue {
   border: none; border-radius: 18px; background: #2f6df6; color: #fff;
   padding: 26px; font-size: 26px; font-weight: 800;
   box-shadow: 0 4px 0 rgba(0, 0, 0, .14);
 }
 .clue:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .14); }
+.clue.mute { background: #fff; color: var(--muted); border: 1px solid var(--line); font-size: 17px; padding: 12px; }
+.clue.mute.on { background: var(--no); border-color: var(--no); color: #fff; }
+
+/* Extra-time buttons: top up the current player's clock mid-round. */
+.timerow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.timerow button {
+  border: 1px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 12px; padding: 14px 6px; font-size: 17px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.timerow button:active { background: #e8eef9; }
 
 /* Push-to-talk now lives in the row below (styled by .row2 button); light its live state. */
 #talk.live { background: var(--no); border-color: var(--no); color: #fff; }
@@ -104,4 +117,4 @@ body.offline .status::before { content: 'Reconnecting… '; }
 }
 .row2 button:active { background: #e8eef9; }
 
-body.offline .pad, body.offline .clue, body.offline .row2, body.offline .rset { opacity: .45; pointer-events: none; }
+body.offline .pad, body.offline .cluerow, body.offline .timerow, body.offline .row2, body.offline .rset { opacity: .45; pointer-events: none; }

@@ -36,6 +36,7 @@ const state = {
   camera: new Camera(),
   cameraOn: false,
   autoRead: true, // read clues aloud by default (checkbox in Play settings)
+  clueMuted: false, // remote 🔇: suppress ALL automatic read-aloud so the teacher reads live
   ttsRate: 0.93, // read-aloud speed multiplier (1 = normal); slightly slow suits ESL
   voiceName: null,
   voicePicked: false,
@@ -50,6 +51,45 @@ const state = {
   launchedPlay: false, // this (setup) tab has opened a game tab
   gameRunning: false, // a game tab has reported itself running
 };
+
+// ---------- Answer sound effects ----------
+// Short jingles for judged answers (passes stay silent). Each kind rotates
+// through its files in a random order, reshuffling when the bag empties, so
+// the same sting never plays twice in a row.
+const FX_FILES = {
+  correct: ['correct.mp3', 'correct2.mp3', 'correct3.mp3', 'correct4.mp3'],
+  wrong: ['incorrect.mp3', 'incorrect2.mp3'],
+};
+const fxBags = { correct: [], wrong: [] };
+const fxLast = { correct: null, wrong: null };
+function playFx(kind) {
+  const files = FX_FILES[kind];
+  if (!files) return;
+  let bag = fxBags[kind];
+  if (!bag.length) {
+    bag = fxBags[kind] = [...files];
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    // a fresh bag could start with the file that just played — push it deeper
+    if (bag.length > 1 && bag[bag.length - 1] === fxLast[kind]) bag.unshift(bag.pop());
+  }
+  const src = bag.pop();
+  fxLast[kind] = src;
+  new Audio(src).play().catch(() => {}); // autoplay blocked → just skip the sting
+}
+
+// Fire the right sting whenever the engine records a new judgement. The engine
+// makes a fresh lastResolved object per answer, so identity tells us it's new.
+let fxSeen = null;
+function playAnswerFx() {
+  const lr = state.game?.lastResolved;
+  if (!lr || lr === fxSeen) return;
+  fxSeen = lr;
+  if (lr.state === 'correct') playFx('correct');
+  else if (lr.state === 'wrong') playFx('wrong');
+}
 
 // ---------- Setup screen ----------
 
@@ -1279,6 +1319,14 @@ function handleRemoteCommand(action, msg) {
     case 'talk-start': if (inGame) startTalk(); break;
     case 'talk-stop': stopTalk(); break;
     case 'read': if (inGame) readCurrentClue(); break;
+    case 'mute': // suppress automatic read-aloud so the teacher can read the clues live
+      if (inGame) {
+        state.clueMuted = !state.clueMuted;
+        if (state.clueMuted) stopNarration();
+        pushRemoteState(); // reflect the new state on the phone's 🔇 button
+      }
+      break;
+    case 'add-time': if (inGame) g.addTime(undefined, msg?.seconds); break; // emits 'tick' → HUD + phones repaint
     case 'toggle-clue': if (inGame) toggleClue(); break;
     case 'camera': if (inGame) toggleCamera(); break;
     case 'fullscreen': toggleFullscreen($('game')); break;
@@ -1322,6 +1370,7 @@ function pushRemoteState() {
     answer: e ? e.answer : '',
     accept: e ? (e.accept || []).join(', ') : '',
     paused: g.paused,
+    muted: state.clueMuted,
     suggestion: state.lastSuggestion || '',
     // current settings, so the phone's ⚙ panel starts from live values
     settings: {
@@ -1392,6 +1441,10 @@ function startGame(players) {
   game.addEventListener('reveal', renderReveal);
   game.addEventListener('tick', renderHud);
   game.addEventListener('end', showResults);
+  // Answer stings: correct answers surface as 'update', wrong ones as 'reveal'.
+  fxSeen = null;
+  game.addEventListener('update', playAnswerFx);
+  game.addEventListener('reveal', playAnswerFx);
 
   applyClueHidden(true); // audio-only by default; teacher can reveal with 👁 / H
   game.start();
@@ -1509,7 +1562,7 @@ function toggleClue() {
   const hidden = !document.body.classList.contains('clue-hidden');
   applyClueHidden(hidden);
   // revealing to audio-only mid-letter: speak the current clue right away
-  if (hidden && state.game && !$('game').classList.contains('hidden')) readCurrentClue();
+  if (hidden && !state.clueMuted && state.game && !$('game').classList.contains('hidden')) readCurrentClue();
 }
 
 function renderClue() {
@@ -1520,8 +1573,9 @@ function renderClue() {
   $('clue-kind').textContent = `${verb} ${entry.letter}`;
   $('clue-text').textContent = entry.clue;
   $('type-answer').value = '';
-  // narrate automatically when auto-read is on, or when the text is hidden
-  if (state.autoRead || document.body.classList.contains('clue-hidden')) readCurrentClue();
+  // narrate automatically when auto-read is on, or when the text is hidden —
+  // unless the remote's 🔇 mute is on (the teacher is reading the clues live)
+  if (!state.clueMuted && (state.autoRead || document.body.classList.contains('clue-hidden'))) readCurrentClue();
 }
 
 function onHypotheses(hyps) {

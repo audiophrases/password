@@ -216,6 +216,7 @@ function synthesize(text, voice, skew = 0, retried = false, isSsml = false, rate
 const MIME = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg',
 };
 const mime = (f) => MIME[path.extname(f).toLowerCase()] || 'application/octet-stream';
 

@@ -18,13 +18,13 @@ function setOnline(online) {
   $('status').textContent = online ? 'Connected' : 'Offline';
 }
 
-function send(action) {
-  const sent = link.send({ t: 'cmd', action });
+function send(action, extra) {
+  const sent = link.send({ t: 'cmd', action, ...extra });
   if (!sent) setOnline(false); // socket wasn't open — reflect it so the teacher sees why
 }
 
 document.querySelectorAll('[data-act]').forEach((b) =>
-  b.addEventListener('click', () => send(b.dataset.act))
+  b.addEventListener('click', () => send(b.dataset.act, b.dataset.sec ? { seconds: +b.dataset.sec } : undefined))
 );
 
 // push-to-talk: hold the button to keep the laptop mic listening
@@ -150,5 +150,8 @@ function applyState(m) {
     : m.suggestion
     ? `speech suggests: ${m.suggestion === 'wrong' ? 'wrong' : 'correct'}`
     : '';
+  // Mute toggle: lit while the game's automatic read-aloud is off.
+  $('mute').classList.toggle('on', !!m.muted);
+  $('mute').textContent = m.muted ? '🔇 Muted' : '🔇 Mute';
   fillSettings(m.settings);
 }

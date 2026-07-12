@@ -86,6 +86,16 @@ export class Game extends EventTarget {
     });
   }
 
+  // Top up one player's clock mid-round (teacher's mercy button on the remote).
+  // No-op on no-timer games (Infinity + n is still Infinity anyway) and on
+  // players who have already finished.
+  addTime(playerIndex, sec) {
+    const p = this.players[playerIndex ?? this.activeIndex];
+    if (!p || p.done || !(sec > 0)) return;
+    if (Number.isFinite(p.timeLeft)) p.timeLeft += Math.floor(sec);
+    this.emit('tick'); // repaint the HUD clocks without advancing the turn
+  }
+
   _tick() {
     clearInterval(this._timer);
     this._timer = setInterval(() => {
