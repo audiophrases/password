@@ -2,10 +2,19 @@
 title Password
 cd /d "%~dp0"
 
-where node >nul 2>nul
+rem Find Node: portable node.exe next to this file, an extracted node-* folder,
+rem or an installed one on PATH (no admin rights needed for the portable ones).
+set "NODE=%~dp0node.exe"
+if not exist "%NODE%" (
+  for /d %%D in ("%~dp0node-*") do if exist "%%D\node.exe" set "NODE=%%D\node.exe"
+)
+if not exist "%NODE%" set "NODE=node"
+"%NODE%" --version >nul 2>nul
 if errorlevel 1 (
-  echo Node.js is not installed.
-  echo Download it from https://nodejs.org then run this again.
+  echo Node.js was not found.
+  echo Install it from https://nodejs.org - or, without admin rights, download the
+  echo Windows Binary .zip and put node.exe ^(or the whole extracted
+  echo node-v*-win-x64 folder^) next to this file.
   echo.
   pause
   exit /b 1
@@ -31,7 +40,7 @@ echo ============================================
 echo.
 
 start "" http://localhost:8000
-node server.js
+"%NODE%" server.js
 
 echo.
 echo Server stopped.
