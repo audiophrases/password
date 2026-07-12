@@ -83,6 +83,7 @@ Rules:
 - Prefer "starts" for the letter; only use "contains" when no good answer fits (then end each clue with "(contains <LETTER>)").
 - Keep answers to a single word where possible, lowercase, no punctuation.
 - Clues must never contain their own answer.
+- Never use a double-quote character (") inside a clue or answer, e.g. to quote a word or title — use single quotes (') instead. An unescaped " breaks the JSON.
 - Output JSON only.`;
 }
 
@@ -126,6 +127,7 @@ Rules:
 - One object per letter listed above, in the same order, keeping each letter's "type" as shown.
 - Every answer and clue in ${language}; answers lowercase, single words where possible.
 - Clues must never contain their own answer.
+- Never use a double-quote character (") inside a clue or answer, e.g. to quote a word or title — use single quotes (') instead. An unescaped " breaks the JSON.
 - Output JSON only.`;
 }
 
@@ -299,6 +301,51 @@ function softenControlChars(s) {
   return out;
 }
 
+// Chatbots occasionally quote a word inside a clue/answer (e.g. precedeix
+// "Nova") without escaping it, which ends the JSON string early and breaks
+// the parse a few tokens later — a confusing error far from the real typo.
+// Heuristic fix: inside a string, an unescaped quote only really closes it if
+// (skipping whitespace) what follows looks like valid JSON continuation (`,`
+// `}` `]` `:` or end of input); otherwise treat it as a stray literal quote
+// and escape it, staying inside the string.
+function repairStrayQuotes(s) {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (esc) {
+      out += ch;
+      esc = false;
+      continue;
+    }
+    if (ch === '\\') {
+      out += ch;
+      esc = true;
+      continue;
+    }
+    if (ch === '"') {
+      if (!inStr) {
+        inStr = true;
+        out += ch;
+        continue;
+      }
+      let j = i + 1;
+      while (j < s.length && /\s/.test(s[j])) j++;
+      const next = s[j];
+      if (next === undefined || ',}]:'.includes(next)) {
+        inStr = false;
+        out += ch;
+      } else {
+        out += '\\"'; // stray quote inside the string — escape it, stay inside
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 // Tolerant parse: accepts raw JSON, ```json fences, surrounding prose, an outer
 // [ ... ] array wrapper (uses the first element), and wrapped/multiline strings.
 export function parseGameText(text) {
@@ -319,6 +366,7 @@ export function parseGameText(text) {
   if (startIdx !== -1 && endIdx > startIdx) raw = raw.slice(startIdx, endIdx + 1);
 
   raw = softenControlChars(raw);
+  raw = repairStrayQuotes(raw);
 
   let obj;
   try {
