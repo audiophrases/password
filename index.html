@@ -65,6 +65,10 @@
 
         <details class="sgroup">
           <summary>Players <span class="hint">names &amp; game language</span></summary>
+          <label>Players this round
+            <input id="active-players" type="number" value="1" min="1" max="6" title="Play with fewer than the game's word circles — the circles mix together across whoever's left." />
+          </label>
+          <p id="active-players-hint" class="hint"></p>
           <div id="players-list"></div>
           <label>Game language
             <select id="language" title="Set from the loaded game; drives the read-aloud voice and speech recognition.">

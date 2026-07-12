@@ -85,6 +85,7 @@ function setPlayerCount(n) {
   }
   players.length = n;
   $('num-players').value = n;
+  if ($('active-players')) $('active-players').value = n;
   renderPlayers(players);
 }
 
@@ -204,6 +205,14 @@ function setupScreen() {
   // Number of players (source of truth lives in section 1).
   $('num-players').addEventListener('change', () => setPlayerCount(+$('num-players').value));
 
+  // Play with fewer players than the loaded game has word circles — the extra
+  // circles' words get mixed in at start instead of just sitting unused.
+  $('active-players').addEventListener('change', () => {
+    const max = state.data ? gameSetCount(state.data) : 6;
+    setPlayerCount(Math.max(1, Math.min(max, +$('active-players').value || 1)));
+    updateCurrentGame();
+  });
+
   // Section 1 language is for the PROMPT only: it just fills in the default letter
   // set to draft. It never touches a loaded game or the read-aloud voice.
   $('prompt-lang').addEventListener('change', () => {
@@ -322,6 +331,7 @@ function updateCurrentGame() {
   if (!box) return;
   const g = state.data;
   updateAppendPanel(g);
+  updateActivePlayersPanel(g);
   if (!g) {
     box.className = 'current-game none';
     box.innerHTML = 'No game loaded — pick or create one in <b>1 · Your games</b>.';
@@ -329,15 +339,42 @@ function updateCurrentGame() {
   }
   const langName =
     [...$('language').options].find((o) => o.value === g.langCode)?.dataset.name || g.language || g.langCode;
+  const sets = gameSetCount(g);
+  const n = state.players.length;
+  const playersLabel =
+    n < sets ? `${n} player${n > 1 ? 's' : ''} (mixed from ${sets} circles)` : `${n} player${n > 1 ? 's' : ''}`;
   box.className = 'current-game';
   box.innerHTML =
-    `<b>${esc(g.title)}</b>` +
-    `<span>${esc(langName)} · ${g.letters.length} letters · ${g.players} player${g.players > 1 ? 's' : ''}</span>`;
+    `<b>${esc(g.title)}</b>` + `<span>${esc(langName)} · ${g.letters.length} letters · ${playersLabel}</span>`;
 }
 
 // ---------- Add circles (word sets) to the loaded game ----------
 
 const gameSetCount = (g) => Math.max(1, ...g.letters.map((l) => (l.variants ? l.variants.length : 1)));
+
+// Section-2 "Players this round" control — lets a game with several word
+// circles (one per player) be played with fewer players than it has circles;
+// the unused circles' words get folded in via a mix at start, not dropped.
+function updateActivePlayersPanel(g) {
+  const input = $('active-players');
+  const hint = $('active-players-hint');
+  if (!input || !hint) return;
+  if (!g) {
+    input.disabled = true;
+    input.max = 6;
+    hint.textContent = 'Load a game to set how many players take part.';
+    return;
+  }
+  const sets = gameSetCount(g);
+  input.disabled = sets <= 1;
+  input.min = 1;
+  input.max = sets;
+  if (+input.value > sets) input.value = sets;
+  hint.textContent =
+    sets > 1
+      ? `“${g.title}” has ${sets} word circles. Play with fewer and the circles mix together.`
+      : `“${g.title}” has a single word circle — one player.`;
+}
 
 // Show the "add circles" panel only when a game is loaded; keep its info line
 // and the new-circles input clamped to what still fits (6 players max).
@@ -1031,10 +1068,16 @@ function currentSettings() {
 function beginGame() {
   if (!state.data) return;
   if (isPlayMode) {
-    if ($('game').classList.contains('hidden')) startGame(state.players);
+    if ($('game').classList.contains('hidden')) {
+      // Fewer players than word circles: fold the extra circles' words in via
+      // a fresh mix each time, instead of just leaving them unused.
+      if (state.players.length < gameSetCount(state.data)) mixSets(state.data);
+      startGame(state.players);
+    }
     return;
   }
   const data = JSON.parse(JSON.stringify(state.data));
+  if (state.players.length < gameSetCount(state.data)) mixSets(data); // same as above, on the handed-off copy
   const s = currentSettings();
   data.settings.mode = s.mode;
   data.settings.strictness = s.strictness;
