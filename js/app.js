@@ -1326,7 +1326,7 @@ function handleRemoteCommand(action, msg) {
         pushRemoteState(); // reflect the new state on the phone's 🔇 button
       }
       break;
-    case 'add-time': if (inGame) g.addTime(undefined, msg?.seconds); break; // emits 'tick' → HUD + phones repaint
+    case 'add-time': if (inGame) g.addTime(msg?.playerIndex, msg?.seconds); break; // emits 'tick' → HUD + phones repaint
     case 'toggle-clue': if (inGame) toggleClue(); break;
     case 'camera': if (inGame) toggleCamera(); break;
     case 'fullscreen': toggleFullscreen($('game')); break;
@@ -1372,6 +1372,15 @@ function pushRemoteState() {
     paused: g.paused,
     muted: state.clueMuted,
     suggestion: state.lastSuggestion || '',
+    // every player's clock, for the phone's per-player "add time" buttons —
+    // not just whoever is currently answering
+    roster: g.players.map((pl, i) => ({
+      name: pl.name,
+      color: pl.color,
+      time: Number.isFinite(pl.timeLeft) ? pl.timeLeft : -1,
+      done: pl.done,
+      active: i === g.activeIndex,
+    })),
     // current settings, so the phone's ⚙ panel starts from live values
     settings: {
       mode: g.data.settings.mode,

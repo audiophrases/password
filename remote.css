@@ -65,14 +65,28 @@ body.offline .status::before { content: 'Reconnecting… '; }
 .clue.mute { background: #fff; color: var(--muted); border: 1px solid var(--line); font-size: 17px; padding: 12px; }
 .clue.mute.on { background: var(--no); border-color: var(--no); color: #fff; }
 
-/* Extra-time buttons: top up the current player's clock mid-round. */
-.timerow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.timerow button {
+/* Extra-time panel: one row per player, so time can be topped up for anyone,
+   not just whoever is currently answering. */
+.timebank-wrap {
+  background: #fff; border: 1px solid var(--line); border-radius: 14px;
+  padding: 10px 14px; box-shadow: 0 2px 10px rgba(20, 35, 59, .08);
+}
+.timebank { display: flex; flex-direction: column; gap: 8px; }
+.tb-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.tb-row.active .tb-name { font-weight: 800; }
+.tb-name {
+  border-left: 6px solid #ccc; padding: 4px 0 4px 10px; font-size: 14px;
+  display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums;
+}
+.tb-name .tb-time { color: var(--muted); }
+.tb-row.done .tb-name { opacity: .5; }
+.tb-row button {
   border: 1px solid var(--line); background: #fff; color: var(--ink);
-  border-radius: 12px; padding: 14px 6px; font-size: 17px; font-weight: 800;
+  border-radius: 10px; padding: 8px 10px; font-size: 14px; font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
-.timerow button:active { background: #e8eef9; }
+.tb-row button:active { background: #e8eef9; }
+.tb-row.done button { pointer-events: none; opacity: .4; }
 
 /* Push-to-talk now lives in the row below (styled by .row2 button); light its live state. */
 #talk.live { background: var(--no); border-color: var(--no); color: #fff; }
@@ -117,4 +131,4 @@ body.offline .status::before { content: 'Reconnecting… '; }
 }
 .row2 button:active { background: #e8eef9; }
 
-body.offline .pad, body.offline .cluerow, body.offline .timerow, body.offline .row2, body.offline .rset { opacity: .45; pointer-events: none; }
+body.offline .pad, body.offline .cluerow, body.offline .timebank-wrap, body.offline .row2, body.offline .rset { opacity: .45; pointer-events: none; }

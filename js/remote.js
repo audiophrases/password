@@ -23,9 +23,16 @@ function send(action, extra) {
   if (!sent) setOnline(false); // socket wasn't open — reflect it so the teacher sees why
 }
 
-document.querySelectorAll('[data-act]').forEach((b) =>
-  b.addEventListener('click', () => send(b.dataset.act, b.dataset.sec ? { seconds: +b.dataset.sec } : undefined))
-);
+// Delegated so buttons built dynamically (the per-player time bank) work the
+// same as the static ones without needing their own listeners wired up.
+document.body.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const extra = {};
+  if (b.dataset.sec) extra.seconds = +b.dataset.sec;
+  if (b.dataset.player != null) extra.playerIndex = +b.dataset.player;
+  send(b.dataset.act, Object.keys(extra).length ? extra : undefined);
+});
 
 // push-to-talk: hold the button to keep the laptop mic listening
 const talk = $('talk');
@@ -49,6 +56,26 @@ function fmt(t) {
   if (t == null) return '';
   if (t < 0) return '∞'; // host sends -1 for a no-timer game
   return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+}
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// One row per player, each with its own +10s/+30s — so time can be given to
+// anyone, not just whoever is currently answering.
+function renderTimebank(roster) {
+  const box = $('timebank');
+  if (!box) return;
+  box.innerHTML = '';
+  (roster || []).forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'tb-row' + (p.active ? ' active' : '') + (p.done ? ' done' : '');
+    row.innerHTML =
+      `<span class="tb-name" style="border-left:6px solid ${p.color || '#ccc'}">${esc(p.name || `Player ${i + 1}`)}` +
+      `<span class="tb-time">${fmt(p.time)}</span></span>` +
+      `<button data-act="add-time" data-player="${i}" data-sec="10">+10s</button>` +
+      `<button data-act="add-time" data-player="${i}" data-sec="30">+30s</button>`;
+    box.appendChild(row);
+  });
 }
 
 // ---- ⚙ game settings panel: mirrors live values, applies without restart ----
@@ -134,6 +161,7 @@ function applyState(m) {
     $('r-answer').textContent = '';
     $('r-accept').textContent = '';
     $('r-sugg').textContent = '';
+    renderTimebank([]);
     return;
   }
   $('r-player').textContent = m.player || '';
@@ -153,5 +181,6 @@ function applyState(m) {
   // Mute toggle: lit while the game's automatic read-aloud is off.
   $('mute').classList.toggle('on', !!m.muted);
   $('mute').textContent = m.muted ? '🔇 Muted' : '🔇 Mute';
+  renderTimebank(m.roster);
   fillSettings(m.settings);
 }
