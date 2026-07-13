@@ -17,6 +17,10 @@ node server.js
 #   Phone remote:        http://<your-LAN-IP>:8000/remote   (printed on start)
 ```
 
+**New machine?** Run **`install.bat`** (Windows) — a guided setup that checks for Node
+(and can download a portable copy into the folder, **no admin rights needed** — ideal for
+school/work computers), then optionally walks you through the cloud relay below.
+
 The static files also work under any plain static host (e.g. `python -m http.server`) or
 GitHub Pages — but the **phone remote needs a relay** (a static host can't forward
 WebSocket traffic): either `node server.js` on the laptop, or the **☁ cloud relay**
@@ -141,6 +145,10 @@ One-time setup, from any machine (free Cloudflare account):
 npx wrangler login    # opens the browser once
 npx wrangler deploy   # prints your URL, e.g. https://password-game.you.workers.dev
 ```
+
+(`install.bat` automates this whole flow — pick **d** to deploy your own relay, or **u**
+to save a URL a colleague shared; colleagues can share one relay, since every game gets
+its own room code.)
 
 Then on the teaching machine: run the game as usual (`password.bat` — the local server
 keeps serving the game and the neural voices), tick **☁ Cloud relay** in the 📱 Phone

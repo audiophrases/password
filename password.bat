@@ -12,9 +12,8 @@ if not exist "%NODE%" set "NODE=node"
 "%NODE%" --version >nul 2>nul
 if errorlevel 1 (
   echo Node.js was not found.
-  echo Install it from https://nodejs.org - or, without admin rights, download the
-  echo Windows Binary .zip and put node.exe ^(or the whole extracted
-  echo node-v*-win-x64 folder^) next to this file.
+  echo Run install.bat next to this file for a guided setup - it can download
+  echo a portable Node into this folder, no admin rights needed.
   echo.
   pause
   exit /b 1
