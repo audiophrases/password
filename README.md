@@ -146,9 +146,11 @@ npx wrangler login    # opens the browser once
 npx wrangler deploy   # prints your URL, e.g. https://password-game.you.workers.dev
 ```
 
-(`install.bat` automates this whole flow — pick **d** to deploy your own relay, or **u**
-to save a URL a colleague shared; colleagues can share one relay, since every game gets
-its own room code.)
+(`install.bat` automates this whole flow. Pick **d** to deploy on **your own** free
+Cloudflare account — recommended, so the quota and control are yours — or **u** to save a
+URL you already deployed from another computer. Sharing one relay does work if a colleague
+deliberately offers theirs — room codes keep simultaneous games separate — but it spends
+the owner's free quota.)
 
 Then on the teaching machine: run the game as usual (`password.bat` — the local server
 keeps serving the game and the neural voices), tick **☁ Cloud relay** in the 📱 Phone
@@ -166,8 +168,9 @@ Notes:
 - The Worker serves the whole game too, so in a pinch (no Node at all) everything can run
   from your Worker URL — you lose only the neural-voice proxy; Edge's built-in natural
   voices still work.
-- To bake the URL in for every machine that pulls the repo, set `CLOUD_RELAY` in
-  `js/config.js` instead of pasting it into the ☁ box.
+- The repo ships `js/config.js` with an empty `CLOUD_RELAY` so each install points at its
+  own relay — `install.bat` fills it in per machine (a local, uncommitted change), or use
+  the ☁ box, which keeps the URL per browser.
 - `wrangler dev` tip: run it as `npx wrangler dev --persist-to "$TEMP/pw-relay-state"` —
   its state files must live *outside* the repo, or the assets watcher sees them change and
   reloads itself in an endless loop.

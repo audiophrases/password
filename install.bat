@@ -82,11 +82,13 @@ echo --------------------------------------------------
 echo   OPTIONAL - cloud relay for the phone remote
 echo --------------------------------------------------
 echo If phones cannot reach this computer, a free Cloudflare relay lets them
-echo join over the internet instead. Several teachers can share one relay -
-echo every game gets its own room code - or you can deploy your own.
+echo join over the internet instead. Each teacher deploys their OWN relay on
+echo their own free Cloudflare account - it stays under your control, on your
+echo own free quota.
 echo.
-echo   d - deploy my own relay, needs a free Cloudflare account, ~5 min
-echo   u - use an existing relay URL a colleague gave me
+echo   d - deploy my own relay - free Cloudflare account, ~5 min - recommended
+echo   u - I already have a relay URL - deployed on another computer, or one
+echo       a colleague deliberately shares
 echo   s - skip for now - password.bat works without it
 echo.
 set "CLOUD=s"
