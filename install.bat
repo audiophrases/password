@@ -96,9 +96,24 @@ if /i "!CLOUD!"=="u" goto cloud_url
 goto done
 
 :cloud_deploy
-rem npx ships next to node.exe in the portable zip; put that folder on PATH.
-for %%A in ("!NODE!") do set "NODEDIR=%%~dpA"
-if /i not "!NODE!"=="node" set "PATH=!NODEDIR!;!PATH!"
+rem npx ships next to node.exe, both in the portable zip and in a normal
+rem install. Prefer the copy next to our Node - it works even when nothing
+rem is on PATH - and fall back to whatever PATH has.
+set "NPX=npx"
+if /i not "!NODE!"=="node" (
+  for %%A in ("!NODE!") do if exist "%%~dpAnpx.cmd" set "NPX=%%~dpAnpx.cmd"
+  for %%A in ("!NODE!") do set "PATH=%%~dpA;!PATH!"
+)
+call "!NPX!" --version >nul 2>nul
+if errorlevel 1 (
+  echo.
+  echo npx was not found next to Node or on PATH, so this computer cannot
+  echo deploy the relay itself. That is fine - deploying is a ONE-TIME step
+  echo you can do from ANY computer: run install.bat on a home PC and pick d,
+  echo then run install.bat here again and pick u to save the relay URL.
+  pause
+  goto done
+)
 
 echo.
 echo Step A - a free Cloudflare account, no credit card needed.
@@ -110,12 +125,12 @@ pause
 echo.
 echo Step B - connect this computer to your account.
 echo A browser tab opens - click Allow.
-call npx -y wrangler login
+call "!NPX!" -y wrangler login
 if errorlevel 1 goto cloud_fail
 
 echo.
 echo Step C - deploying your relay to Cloudflare's free tier...
-call npx -y wrangler deploy
+call "!NPX!" -y wrangler deploy
 if errorlevel 1 goto cloud_fail
 echo.
 echo In the output above, wrangler printed your relay address - it looks like
