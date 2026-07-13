@@ -1,0 +1,18 @@
+# Files the cloud Worker should NOT serve as static assets
+# (server-side, tooling, or local-only — everything else is the game).
+server.js
+password.bat
+wrangler.jsonc
+relay/
+README.md
+.assetsignore
+.claude/
+.git/
+.gitignore
+.DS_Store
+.wrangler/
+.codegraph/
+.vscode/
+node_modules/
+node.exe
+node-*/

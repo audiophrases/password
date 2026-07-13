@@ -3,3 +3,8 @@
 .vscode/
 .DS_Store
 node_modules/
+.wrangler/
+
+# Portable Node dropped next to password.bat on machines without admin rights
+node.exe
+node-*/

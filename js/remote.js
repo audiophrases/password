@@ -4,8 +4,12 @@ import { connect } from './link.js';
 
 const $ = (id) => document.getElementById(id);
 
+// ?room=CODE pairs this phone with one game on the shared cloud relay (the
+// game's setup screen puts it in the URL/QR). Absent on the local relay,
+// where the Wi-Fi network itself is the room.
 const link = connect({
   role: 'remote',
+  room: new URLSearchParams(location.search).get('room') || 'main',
   onState: applyState,
   onStatus: (s) => setOnline(s === 'open'),
 });

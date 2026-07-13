@@ -119,6 +119,12 @@
           <summary>📱 Phone remote</summary>
           <div id="remote-info" class="hint remote-info"></div>
           <div id="remote-qr" class="remote-qr"></div>
+          <label class="check relay-cloud" title="Phones connect through a relay on the internet instead of this computer — use when the Wi-Fi blocks phone ↔ computer traffic (work/school networks)">
+            <input id="relay-cloud" type="checkbox" /> ☁ Cloud relay (Wi-Fi blocks the phone)
+          </label>
+          <input id="relay-origin" type="url" class="relay-origin" hidden
+                 placeholder="https://password-game.you.workers.dev"
+                 title="URL of your deployed relay Worker — see README → Cloud relay" />
         </details>
       </div>
 

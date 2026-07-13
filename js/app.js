@@ -6,6 +6,7 @@ import { Recognizer, recognitionSupported, speak, stopSpeaking, voicesFor, onVoi
 import { scoreAnswer } from './match.js';
 import { Camera, toggleFullscreen } from './camera.js';
 import { connect } from './link.js';
+import { CLOUD_RELAY } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 const PLAYER_COLORS = ['#e8632c', '#1f9d55', '#2b6cb0', '#9b2c98', '#b7791f', '#0d9488'];
@@ -48,6 +49,7 @@ const state = {
   link: null,
   remoteUrl: '',
   remotes: 0,
+  relayMode: 'local', // 'local' (server.js on this machine) | 'cloud' (relay/worker.js)
   launchedPlay: false, // this (setup) tab has opened a game tab
   gameRunning: false, // a game tab has reported itself running
 };
@@ -1239,33 +1241,113 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.add('hidden'), 1600);
 }
 
-// ---------- Phone remote (companion controller over the local relay) ----------
+// ---------- Phone remote (companion controller over a relay) ----------
+//
+// Two routes to the phones, same protocol (see link.js):
+//   local (default) — the ws relay inside server.js; phones join over the LAN.
+//     Lowest lag and works without internet, but needs phone → laptop traffic
+//     to be allowed (home Wi-Fi: yes; work/school networks: often no).
+//   ☁ cloud — a Cloudflare Worker (relay/worker.js) that BOTH sides dial out
+//     to, so inbound firewalls and client isolation never matter. The game tab
+//     keeps running from the local server (neural TTS stays available); only
+//     the relay hop moves to the cloud. Rooms are keyed by a sticky per-browser
+//     code so the shared Worker can carry many games at once.
+
+const RELAY_CLOUD_KEY = 'password.cloudRelay.v1'; // '1' = ☁ box ticked
+const RELAY_ORIGIN_KEY = 'password.cloudRelayUrl.v1'; // user-entered Worker URL
+const RELAY_ROOM_KEY = 'password.cloudRoom.v1'; // sticky per-browser room code
+
+// Sticky random room code: unguessable enough for a classroom game, short
+// enough to retype from the QR caption if scanning fails.
+function relayRoom() {
+  let code = localStorage.getItem(RELAY_ROOM_KEY) || '';
+  if (!/^[a-z0-9]{6}$/.test(code)) {
+    const abc = 'abcdefghjkmnpqrstuvwxyz23456789'; // no i/l/o/0/1 look-alikes
+    code = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => abc[b % abc.length]).join('');
+    localStorage.setItem(RELAY_ROOM_KEY, code);
+  }
+  return code;
+}
+
+// The Worker URL: typed into the ☁ input (persisted) → baked into config.js →
+// the page's own origin when it *is* the Worker (its /ws answers 426 to a
+// plain GET, where a static host like GitHub Pages would 404).
+async function resolveCloudOrigin() {
+  const typed = (localStorage.getItem(RELAY_ORIGIN_KEY) || '').trim() || CLOUD_RELAY.trim();
+  const origin = typed.replace(/\/+$/, '');
+  if (/^https?:\/\//.test(origin)) return origin;
+  try {
+    const r = await fetch('/ws');
+    if (r.status === 426) return location.origin;
+  } catch {
+    /* offline */
+  }
+  return '';
+}
 
 async function initRemoteLink() {
+  state.link?.close(); // re-entrant: the ☁ controls re-run this on change
+  state.link = null;
+  state.remotes = 0;
+  state.remoteUrl = '';
+
   let info = null;
   try {
     const r = await fetch('/lan-info');
     if (r.ok) info = await r.json();
   } catch {
-    /* relay not running */
+    /* not the local server (cloud or static hosting) */
   }
-  if (!info) {
-    if ($('remote-info')) $('remote-info').textContent = 'Phone remote: run “node server.js” on the laptop to enable it.';
-    return;
+  if (info) {
+    // server present -> Microsoft neural voices available via /tts
+    state.neuralAvailable = true;
+    const nb = $('neural');
+    if (nb && !state.neuralBroken) {
+      nb.disabled = false;
+      nb.checked = true;
+      state.useNeural = true;
+      if ($('neural-note')) $('neural-note').textContent = 'Using Microsoft neural voices via the server.';
+      populateVoices($('language').value);
+    }
   }
-  state.remoteUrl = `http://${info.ip}:${info.port}/remote`;
-  // server present -> Microsoft neural voices available via /tts
-  state.neuralAvailable = true;
-  const nb = $('neural');
-  if (nb && !state.neuralBroken) {
-    nb.disabled = false;
-    nb.checked = true;
-    state.useNeural = true;
-    if ($('neural-note')) $('neural-note').textContent = 'Using Microsoft neural voices via the server.';
-    populateVoices($('language').value);
+
+  // Without the local relay, the cloud is the only possible route.
+  const cloud = !info || localStorage.getItem(RELAY_CLOUD_KEY) === '1';
+  const box = $('relay-cloud');
+  if (box) {
+    box.checked = cloud;
+    box.disabled = !info;
   }
+
+  const origin = cloud ? await resolveCloudOrigin() : '';
+  const urlInput = $('relay-origin');
+  if (urlInput) {
+    if (!urlInput.value) urlInput.value = (localStorage.getItem(RELAY_ORIGIN_KEY) || CLOUD_RELAY || '').trim();
+    // hidden when it has nothing to add: local mode, or the page IS the relay
+    urlInput.hidden = !cloud || (!!origin && origin === location.origin);
+  }
+
+  state.relayMode = cloud ? 'cloud' : 'local';
+  let room = 'main';
+  if (cloud) {
+    if (!origin) {
+      if ($('remote-info'))
+        $('remote-info').textContent =
+          'Phone remote: paste your cloud relay URL above (README → “Cloud relay”)' +
+          (info ? ', or untick ☁ to pair over this Wi-Fi.' : ' — or run “node server.js” on the laptop.');
+      if ($('remote-qr')) $('remote-qr').innerHTML = '';
+      return;
+    }
+    room = relayRoom();
+    state.remoteUrl = `${origin}/remote?room=${room}`;
+  } else {
+    state.remoteUrl = `http://${info.ip}:${info.port}/remote`;
+  }
+
   state.link = connect({
     role: 'host',
+    room,
+    relay: cloud && origin !== location.origin ? origin : '',
     onCmd: handleRemoteCommand,
     onPeers: (m) => {
       state.remotes = m.remotes;
@@ -1279,10 +1361,20 @@ async function initRemoteLink() {
   renderQR();
 }
 
+$('relay-cloud')?.addEventListener('change', (e) => {
+  localStorage.setItem(RELAY_CLOUD_KEY, e.target.checked ? '1' : '0');
+  initRemoteLink();
+});
+$('relay-origin')?.addEventListener('change', (e) => {
+  localStorage.setItem(RELAY_ORIGIN_KEY, e.target.value.trim());
+  initRemoteLink();
+});
+
 function renderRemoteInfo() {
   const el = $('remote-info');
   if (!el || !state.remoteUrl) return;
-  const conn = state.remotes > 0 ? `connected: ${state.remotes} 📱` : 'scan or open on your phone (same Wi‑Fi)';
+  const here = state.relayMode === 'cloud' ? 'scan or open on your phone (any network)' : 'scan or open on your phone (same Wi‑Fi)';
+  const conn = state.remotes > 0 ? `connected: ${state.remotes} 📱` : here;
   el.innerHTML = `📱 Phone remote — <b>${state.remoteUrl}</b> · ${conn}`;
 }
 

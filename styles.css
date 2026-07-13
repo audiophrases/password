@@ -177,6 +177,8 @@ textarea.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size
 .remote-info b { color: var(--ink); }
 .remote-qr { margin: 0 0 10px; }
 .remote-qr img { width: 148px; height: 148px; image-rendering: pixelated; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+.relay-cloud { margin-top: 2px; }
+.relay-origin { width: 100%; margin: 4px 0 8px; font-size: 12.5px; }
 
 /* ---------------- Editor ---------------- */
 #editor { padding: 14px 22px 48px; max-width: 1120px; margin: 0 auto; }

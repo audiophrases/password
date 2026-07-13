@@ -18,8 +18,9 @@ node server.js
 ```
 
 The static files also work under any plain static host (e.g. `python -m http.server`) or
-GitHub Pages — but the **phone remote needs `node server.js`** (a static host can't relay
-WebSocket traffic).
+GitHub Pages — but the **phone remote needs a relay** (a static host can't forward
+WebSocket traffic): either `node server.js` on the laptop, or the **☁ cloud relay**
+(see "Phone remote" below), which also works on networks that block the phone entirely.
 
 ## Languages & voices
 
@@ -125,6 +126,44 @@ connections itself, so the relay is the rendezvous.
 > If the school Wi-Fi blocks device-to-device traffic ("client isolation"), turn on your phone's
 > hotspot and join the laptop to it — same private network, no internet required.
 
+### ☁ Cloud relay — when the network blocks the phone entirely
+
+Locked-down work machines can make the local relay impossible: allowing inbound
+connections through the Windows firewall needs admin rights, and client-isolation Wi-Fi
+kills phone → laptop traffic even on the hotspot. The cloud relay routes around all of it:
+a tiny Cloudflare Worker (`relay/worker.js`, free tier) forwards the same messages, and
+**both the game and the phones dial out to it** — no inbound connection anywhere, nothing
+to allow, no admin rights.
+
+One-time setup, from any machine (free Cloudflare account):
+
+```bash
+npx wrangler login    # opens the browser once
+npx wrangler deploy   # prints your URL, e.g. https://password-game.you.workers.dev
+```
+
+Then on the teaching machine: run the game as usual (`password.bat` — the local server
+keeps serving the game and the neural voices), tick **☁ Cloud relay** in the 📱 Phone
+remote box, and paste your Worker URL. The QR/address switches to
+`https://…/remote?room=abc123`, which phones can open from **any** network (school Wi-Fi,
+mobile data…). The room code is a sticky random code per browser, so several teachers can
+share one deployed relay without colliding; anyone who has your full URL could press your
+buttons, so share the QR, not a screenshot of it, if that matters.
+
+Notes:
+
+- Untick ☁ to return to the pure-LAN path — nothing about local mode changed.
+  Button lag over the cloud is one round-trip to the nearest Cloudflare edge
+  (usually well under 100 ms) instead of LAN-instant.
+- The Worker serves the whole game too, so in a pinch (no Node at all) everything can run
+  from your Worker URL — you lose only the neural-voice proxy; Edge's built-in natural
+  voices still work.
+- To bake the URL in for every machine that pulls the repo, set `CLOUD_RELAY` in
+  `js/config.js` instead of pasting it into the ☁ box.
+- `wrangler dev` tip: run it as `npx wrangler dev --persist-to "$TEMP/pw-relay-state"` —
+  its state files must live *outside* the repo, or the assets watcher sees them change and
+  reloads itself in an endless loop.
+
 ## Game JSON schema
 
 Each letter has one or more **variants** — one per player, so students in the same room don't
@@ -170,5 +209,7 @@ one shared variant.
 | `server.js` | static server + phone-remote WebSocket relay + neural-TTS proxy (no deps) |
 | `remote.html` / `remote.css` / `js/remote.js` | the phone controller page |
 | `js/link.js` | WebSocket client shared by the game and the remote |
+| `js/config.js` | optional baked-in cloud relay URL |
+| `relay/worker.js` + `wrangler.jsonc` + `.assetsignore` | ☁ cloud relay: Cloudflare Worker (rooms as Durable Objects) that also serves the site |
 | `js/vendor/qrcode.js` | vendored MIT QR generator (offline) for the remote-pairing QR |
 | `sample-game.json` | a ready-to-play A2 round |

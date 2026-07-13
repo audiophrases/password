@@ -1,0 +1,22 @@
+// wrangler.jsonc — deploys the OPTIONAL cloud relay (relay/worker.js) plus the
+// static site to Cloudflare's free tier. Not needed for normal local play —
+// see README "Cloud relay".
+//
+//   npx wrangler login     (once — opens the browser)
+//   npx wrangler deploy    (prints your https://password-game.<you>.workers.dev URL)
+//
+// Local testing: npx wrangler dev --persist-to "$TEMP/pw-relay-state"
+// (state must live OUTSIDE the repo — the assets watcher reload-loops otherwise)
+{
+  "name": "password-game",
+  "main": "relay/worker.js",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "."
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOMS", "class_name": "RelayRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RelayRoom"] }],
+  "observability": { "enabled": true }
+}
