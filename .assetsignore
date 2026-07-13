@@ -2,6 +2,7 @@
 # (server-side, tooling, or local-only — everything else is the game).
 server.js
 password.bat
+install.bat
 wrangler.jsonc
 relay/
 README.md
