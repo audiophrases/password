@@ -44,6 +44,8 @@ const state = {
   neuralAvailable: false,
   useNeural: false,
   neuralBroken: false,
+  neuralFailStreak: 0, // consecutive failures; 2 in a row trips neuralBroken (one blip shouldn't)
+  neuralRetryAt: 0, // once broken, timestamp to quietly try neural again instead of staying broken all game
   edit: { set: 0, sets: 1 },
   lastSuggestion: null,
   link: null,
@@ -182,13 +184,23 @@ function neuralVoiceFor(langCode, selectedId) {
 }
 
 function neuralFailed() {
-  // server TTS failed (offline / token rejected): drop to the browser voice for good
+  // A single failure is treated as a transient blip (bad luck / a dropped packet /
+  // rate-limiting) and just falls back to the browser voice for that one line. Only
+  // two in a row disables neural — and even then it retries itself later instead of
+  // staying broken for the rest of the game (see the top of narrate()).
+  state.neuralFailStreak++;
+  if (state.neuralFailStreak < 2) return;
   state.neuralBroken = true;
   state.useNeural = false;
+  state.neuralRetryAt = Date.now() + 20000;
   const nb = $('neural');
   if (nb) nb.checked = false;
-  if ($('neural-note')) $('neural-note').textContent = 'Neural voice unavailable — using the browser voice.';
+  if ($('neural-note')) $('neural-note').textContent = 'Neural voice having trouble — retrying automatically…';
   populateVoices($('language').value);
+}
+
+function neuralSucceeded() {
+  state.neuralFailStreak = 0;
 }
 
 // Read-aloud speed: keep state, the slider, and its label in sync (clamped to
@@ -206,6 +218,16 @@ const ttsUrl = (voiceId, text, rate) =>
 // Generic narration of a single piece of text (used by the voice test button).
 function narrate(text, langCode) {
   if (!text) return;
+  // Neural broke earlier this game but the cooldown has passed — quietly try it
+  // again rather than staying stuck on the robotic browser voice for good.
+  if (state.neuralBroken && state.neuralAvailable && Date.now() >= state.neuralRetryAt) {
+    state.neuralBroken = false;
+    state.useNeural = true;
+    const nb = $('neural');
+    if (nb) nb.checked = true;
+    if ($('neural-note')) $('neural-note').textContent = 'Using Microsoft neural voices via the server.';
+    populateVoices($('language').value);
+  }
   const useNeural = state.useNeural && state.neuralAvailable && !state.neuralBroken && ttsAudio;
   if (useNeural) {
     const sel = $('voice').selectedOptions[0];
@@ -217,6 +239,7 @@ function narrate(text, langCode) {
       neuralFailed();
       speak(text, langCode, state.voiceName, state.ttsRate);
     };
+    ttsAudio.onplaying = () => neuralSucceeded();
     ttsAudio.src = ttsUrl(voiceId, text, state.ttsRate);
     ttsAudio.play().catch(() => {});
     return;
@@ -229,6 +252,7 @@ function stopNarration() {
   if (ttsAudio) {
     ttsAudio.onerror = null;
     ttsAudio.onended = null;
+    ttsAudio.onplaying = null;
     try {
       ttsAudio.pause();
       ttsAudio.removeAttribute('src');

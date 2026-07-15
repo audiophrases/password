@@ -73,7 +73,7 @@ function maskedFrame(payload, opcode = 0x1) {
   return Buffer.concat([header, mask, masked]);
 }
 
-function synthesize(text, voice, skew = 0, retried = false, isSsml = false, rate = 1) {
+function synthesizeOnce(text, voice, skew, isSsml, rate, onFirstChunk, onChunk, retried = false) {
   return new Promise((resolve, reject) => {
     const connId = crypto.randomUUID().replace(/-/g, '');
     const query =
@@ -103,9 +103,12 @@ function synthesize(text, voice, skew = 0, retried = false, isSsml = false, rate
     let buf = Buffer.alloc(0);
     let fragOp = 0;
     let frag = Buffer.alloc(0);
-    const chunks = [];
+    let gotAudio = false;
     let done = false;
-    const timer = setTimeout(() => finish(new Error('tts timeout')), 15000);
+    // Real synthesis rarely takes more than a second or two; keep this short so a
+    // hung connection fails fast enough for the one automatic retry (below) to
+    // still land before the wait becomes noticeable.
+    const timer = setTimeout(() => finish(new Error('tts timeout')), 6000);
 
     function finish(err) {
       if (done) return;
@@ -117,14 +120,20 @@ function synthesize(text, voice, skew = 0, retried = false, isSsml = false, rate
         /* ignore */
       }
       if (err) reject(err);
-      else resolve(Buffer.concat(chunks));
+      else resolve();
     }
 
     function onMessage(opcode, payload) {
       if (opcode === 0x2) {
         const headerLen = payload.readUInt16BE(0);
         const audio = payload.slice(2 + headerLen);
-        if (audio.length) chunks.push(audio);
+        if (audio.length) {
+          if (!gotAudio) {
+            gotAudio = true;
+            onFirstChunk();
+          }
+          onChunk(audio);
+        }
       } else if (opcode === 0x1) {
         if (payload.toString('utf8').includes('Path:turn.end')) finish();
       } else if (opcode === 0x8) {
@@ -152,7 +161,10 @@ function synthesize(text, voice, skew = 0, retried = false, isSsml = false, rate
             } catch {
               /* ignore */
             }
-            synthesize(text, voice, serverMs / 1000 - Date.now() / 1000, true, isSsml, rate).then(resolve, reject);
+            synthesizeOnce(text, voice, serverMs / 1000 - Date.now() / 1000, isSsml, rate, onFirstChunk, onChunk, true).then(
+              resolve,
+              reject
+            );
             return;
           }
           return finish(new Error('handshake: ' + head.split('\r\n')[0]));
@@ -209,8 +221,40 @@ function synthesize(text, voice, skew = 0, retried = false, isSsml = false, rate
       }
     });
     socket.on('error', (e) => finish(e));
-    socket.on('close', () => finish(chunks.length ? undefined : new Error('closed early')));
+    socket.on('close', () => finish(gotAudio ? undefined : new Error('closed early')));
   });
+}
+
+// Stream synthesis straight to the HTTP response as audio chunks arrive, instead
+// of buffering the whole clip first — playback can start before the clue has
+// finished generating. If the connection never gets any audio (handshake reject,
+// dropped connection, etc.) it gets one silent retry before giving up, since a
+// single transient failure here shouldn't be treated as "the service is down".
+function synthesizeToResponse(text, voice, isSsml, rate, res) {
+  let headSent = false;
+  const onFirstChunk = () => {
+    headSent = true;
+    res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'public, max-age=86400' });
+  };
+  const onChunk = (audio) => res.write(audio);
+
+  const attempt = () => synthesizeOnce(text, voice, 0, isSsml, rate, onFirstChunk, onChunk);
+
+  attempt()
+    .then(() => res.end())
+    .catch(() => {
+      if (headSent) return res.end(); // already streaming — nothing clean to do but stop
+      attempt()
+        .then(() => res.end())
+        .catch((err) => {
+          console.warn('TTS error:', err.message);
+          if (headSent) res.end();
+          else {
+            res.writeHead(502, { 'Content-Type': 'text/plain' });
+            res.end('tts failed: ' + err.message);
+          }
+        });
+    });
 }
 
 const MIME = {
@@ -259,16 +303,7 @@ const server = http.createServer((req, res) => {
       res.end('no text');
       return;
     }
-    synthesize(text, voice, 0, false, isSsml, rate)
-      .then((audio) => {
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store' });
-        res.end(audio);
-      })
-      .catch((e) => {
-        console.warn('TTS error:', e.message);
-        res.writeHead(502, { 'Content-Type': 'text/plain' });
-        res.end('tts failed: ' + e.message);
-      });
+    synthesizeToResponse(text, voice, isSsml, rate, res);
     return;
   }
   const file = path.normalize(path.join(ROOT, p));
@@ -488,4 +523,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { synthesize, secMsGec };
+module.exports = { synthesizeOnce, secMsGec };
