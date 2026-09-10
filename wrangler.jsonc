@@ -12,11 +12,24 @@
   "main": "relay/worker.js",
   "compatibility_date": "2025-06-01",
   "assets": {
-    "directory": "."
+    "directory": ".",
+    // /api/* must reach the Worker for every method, not just for paths that
+    // happen to match no file. Scoped deliberately: making the Worker run first
+    // for everything would bill every page load, while static assets are free.
+    "run_worker_first": ["/api/*"]
   },
   "durable_objects": {
-    "bindings": [{ "name": "ROOMS", "class_name": "RelayRoom" }]
+    "bindings": [
+      { "name": "ROOMS", "class_name": "RelayRoom" },
+      { "name": "LIBRARY", "class_name": "Library" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RelayRoom"] }],
+  // A migration tag records what has already been applied, so "Library" cannot
+  // be added to v1 — v1 will never run again. Appending v2 is non-destructive
+  // and leaves RelayRoom and its data alone.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RelayRoom"] },
+    { "tag": "v2", "new_sqlite_classes": ["Library"] }
+  ],
   "observability": { "enabled": true }
 }

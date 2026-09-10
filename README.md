@@ -66,8 +66,11 @@ announced with the letter in the game's language — e.g. *"Begins with the lett
      to delete. **💾 Save current game** stores whatever is currently loaded.
    - **Import** (the collapsible at the bottom) brings a game in from a chatbot (paste the JSON),
      a `.txt`/`.json` file, or the built-in sample. Imported games load immediately; Save to keep.
+   - **⬇ Export all games** saves the whole library to one file, and **🔑 Cloud library** keeps it
+     the same on every computer you teach from — see "Your games on every computer" below.
 
-   Saved games persist across sessions in this browser (no files).
+   Saved games persist across sessions in this browser. Renaming a game in the editor saves a
+   *copy* and leaves the original alone, so a round is never overwritten by accident.
 3. **Add players, pick a judging mode, press Start.**
 
 ### In-game keys (the teacher is always the final judge)
@@ -152,6 +155,8 @@ URL you already deployed from another computer. Sharing one relay does work if a
 deliberately offers theirs — room codes keep simultaneous games separate — but it spends
 the owner's free quota.)
 
+(A shared relay does not share saved games — see "Your games on every computer" below.)
+
 Then on the teaching machine: run the game as usual (`password.bat` — the local server
 keeps serving the game and the neural voices), tick **☁ Cloud relay** in the 📱 Phone
 remote box, and paste your Worker URL. The QR/address switches to
@@ -173,7 +178,53 @@ Notes:
   the ☁ box, which keeps the URL per browser.
 - `wrangler dev` tip: run it as `npx wrangler dev --persist-to "$TEMP/pw-relay-state"` —
   its state files must live *outside* the repo, or the assets watcher sees them change and
-  reloads itself in an endless loop.
+  reloads itself in an endless loop. This matters more now that the cloud library keeps
+  real data: `wrangler dev` reads and writes that local folder, so a key opens a *different*
+  (empty) library there than the same key does in production.
+
+## Your games on every computer
+
+Section 2's library lives in **one browser**. Because browser storage is separate per
+address, a round saved at `localhost:8000` is invisible from `127.0.0.1:8000`, from your
+Worker URL, from another laptop, and from another browser profile — which is how good
+rounds quietly go missing.
+
+Two ways out, and the first works everywhere with no setup at all.
+
+### ⬇ Export / ⬆ Import — the backup
+
+**⬇ Export all games** downloads the whole library as one JSON file; **⬆ Import games file**
+merges one back in. Works offline, on `file://`, on GitHub Pages — no account, no relay.
+
+Importing **merges**, it never replaces: each round is identified by its *content*, so
+importing the same file twice adds nothing, and importing a colleague's file adds only what
+you don't already have. Keep an export somewhere safe — it is the one copy that survives a
+cleared browser.
+
+### 🔑 Cloud library — the same games everywhere, automatically
+
+If you have deployed the ☁ cloud relay above, you already have everything needed. Open
+**🔑 Cloud library** in section 2 and press **Generate** — once, on your first computer.
+Copy the key, and paste it into the same box on every other computer you teach from.
+
+That's it. Games you save are uploaded in the background; games saved elsewhere appear on
+the next load. The library keeps working with no internet — the browser copy is the one the
+game actually reads, so a round always opens instantly and plays through a dead Wi-Fi. The
+cloud is a mirror that catches up when it can.
+
+- **Generate the key — never invent one.** There is no password check: a key simply *is* the
+  address of a library. A mistyped key doesn't fail, it opens a different empty one, so the
+  status line shows a short fingerprint (`Library 4f2a9c · 14 games`) to compare at a glance,
+  and the game asks before starting a second library on a computer that already has games.
+- **Anyone with the key can read and change your games.** Send it to yourself, not to a class.
+- **Lose the key and the cloud copy is unreachable** — nothing can recover it. Your games are
+  still in every browser you have used, and ⬇ Export is the real backup.
+- Colleagues sharing one relay do **not** share a library: different keys are different
+  libraries. Sharing a relay only shares the phone-remote hop.
+- Editing the same round on two computers before they sync keeps **both**, with the second
+  one labelled `(from this laptop)`. Nothing is silently overwritten; delete the one you
+  don't want.
+- Deleting a game deletes it everywhere on the next sync, so the 🗑 button asks first.
 
 ## Game JSON schema
 
@@ -221,6 +272,8 @@ one shared variant.
 | `remote.html` / `remote.css` / `js/remote.js` | the phone controller page |
 | `js/link.js` | WebSocket client shared by the game and the remote |
 | `js/config.js` | optional baked-in cloud relay URL |
+| `js/library.js` | 🔑 cloud library: offline-first sync of the saved-games library |
 | `relay/worker.js` + `wrangler.jsonc` + `.assetsignore` | ☁ cloud relay: Cloudflare Worker (rooms as Durable Objects) that also serves the site |
+| `relay/library.js` | 🔑 cloud library: the saved games, as a Durable Object with SQLite |
 | `js/vendor/qrcode.js` | vendored MIT QR generator (offline) for the remote-pairing QR |
 | `sample-game.json` | a ready-to-play A2 round |

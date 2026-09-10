@@ -373,3 +373,15 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
 .result-row:first-child { font-size: 21px; font-weight: 700; }
 .result-row:first-child span:first-child::before { content: '🏆 '; }
 .result-card .btn { margin-top: 18px; }
+
+/* Cloud library: the key is long and unspaced, so give it room and a mono face
+   (it shares the look of the relay URL box above it). */
+.lib-key {
+  flex: 1 1 22ch;
+  min-width: 18ch;
+  font-size: 0.9rem;
+}
+.sync-status {
+  margin-top: 0.4rem;
+  word-break: break-word;
+}

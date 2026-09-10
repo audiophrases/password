@@ -25,6 +25,24 @@
           <button id="edit-game" class="btn">✏️ New game</button>
           <button id="save-local" class="btn ghost" disabled>💾 Save current game</button>
         </div>
+        <div class="field-row">
+          <button id="export-library" class="btn ghost" title="Download every saved game as one JSON file — your backup, and how you carry them to another computer">⬇ Export all games</button>
+          <button id="import-library" class="btn ghost" title="Merge a library file back in — games already saved here are left alone">⬆ Import games file</button>
+          <input id="library-file" type="file" accept=".json,application/json" hidden />
+        </div>
+        <details id="sync-details" class="import">
+          <summary>🔑 Cloud library — the same games on every computer</summary>
+          <p class="hint">One key opens your library everywhere. Generate it here, then paste it on your other computers — games you save sync both ways. Needs a deployed cloud relay (README → “Cloud relay”). Anyone who has the key can read and change your games, so keep it to yourself.</p>
+          <div class="field-row">
+            <input id="library-key" type="text" class="mono lib-key" placeholder="paste your library key" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <button id="library-generate" class="btn ghost" title="Make a new key — do this once, on your first computer">Generate</button>
+            <button id="library-copy" class="btn ghost" title="Copy the key so you can paste it on another computer">Copy</button>
+          </div>
+          <div class="field-row">
+            <button id="library-sync" class="btn">↻ Sync now</button>
+          </div>
+          <div id="sync-status" class="hint sync-status"></div>
+        </details>
         <div id="validation" class="msg"></div>
         <details id="import-details" class="import">
           <summary>Import from a chatbot, file, or sample</summary>

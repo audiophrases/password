@@ -7,6 +7,15 @@ import { scoreAnswer } from './match.js';
 import { Camera, toggleFullscreen } from './camera.js';
 import { connect } from './link.js';
 import { CLOUD_RELAY } from './config.js';
+import {
+  sync as librarySync,
+  syncSoon,
+  getKey as getLibraryKey,
+  setKey as setLibraryKey,
+  generateKey,
+  validKey,
+  fingerprint,
+} from './library.js';
 
 const $ = (id) => document.getElementById(id);
 const PLAYER_COLORS = ['#e8632c', '#1f9d55', '#2b6cb0', '#9b2c98', '#b7791f', '#0d9488'];
@@ -31,6 +40,8 @@ const ttsAudio = typeof Audio !== 'undefined' ? new Audio() : null;
 const state = {
   game: null,
   data: null,
+  openId: null, // library id of the loaded game; null = unsaved or freshly imported
+  cloudOrigin: '', // resolved Worker origin; the games library syncs here
   circles: [],
   players: [],
   recognizer: null,
@@ -554,6 +565,7 @@ function loadGameText(text, players) {
     return;
   }
   state.data = result.game;
+  state.openId = null; // openSaved() re-sets this; an import or edit is a new game until saved
   // A game is only its CONTENT: sync the game language (drives voice/ASR) and the
   // player count (word sets). Play settings — mode/strictness/time/voice — are the
   // teacher's own and are never touched by loading a game.
@@ -771,22 +783,126 @@ function saveEditorData() {
 }
 
 // ---------- Saved games (browser storage) ----------
+// v1 kept games in a { [title]: game } map, so the title WAS the primary key:
+// two rounds with one title silently overwrote each other, renaming orphaned the
+// original, and two browsers' libraries could never be merged. v2 keys by a
+// stable id instead, so a library can be exported, carried, and merged.
+//
+// The v1 key is migrated once and then LEFT ALONE FOREVER as a rollback net —
+// never write to it, never delete it.
 
-const STORE_KEY = 'password.games.v1';
+const STORE_KEY = 'password.games.v1'; // legacy; read once by migrateV1()
+const STORE_KEY_V2 = 'password.games.v2';
+
+// An entry is { id, title, clientAt, deleted, version, dirty, game }.
+//   version — the server version this copy was last synced at (0 = never).
+//   deleted — tombstone; the game payload is kept so a mistake stays recoverable.
+//   dirty   — changed here since the last sync, so it still needs pushing. Only
+//             dirty entries are sent, which is what makes a steady-state sync
+//             one request that transfers nothing.
+
+// Ids are derived from the game's CONTENT, which is what makes merging work:
+// two machines holding the identical round mint the same id, so importing one
+// into the other is a no-op instead of a duplicate; genuinely different rounds
+// that share a title mint different ids, so both survive.
+//
+// Deliberately not crypto.subtle/randomUUID: both need a secure context, and
+// this app is routinely served over plain http from a LAN IP, where they are
+// undefined. cyrb128 is 128 bits, synchronous, and works on every origin —
+// collision resistance is all that's needed here, not unforgeability.
+function hash128(str) {
+  let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+  for (let i = 0; i < str.length; i++) {
+    const k = str.charCodeAt(i);
+    h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+    h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+    h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+    h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+  }
+  h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+  h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+  h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+  h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+  return [(h1 ^ h2 ^ h3 ^ h4) >>> 0, (h2 ^ h1) >>> 0, (h3 ^ h1) >>> 0, (h4 ^ h1) >>> 0]
+    .map((n) => n.toString(16).padStart(8, '0'))
+    .join('');
+}
+
+// Key order must not change the hash, or the same game hashes two ways.
+function canonicalJson(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  return `{${Object.keys(v)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${canonicalJson(v[k])}`)
+    .join(',')}}`;
+}
+
+// Hash the VALIDATED game, never the raw object: validateGame fills in defaults
+// (mode, strictness, durationSec), uppercases letters and expands the legacy
+// {answer, accept, clue} shape into variants. Hashing raw input would give the
+// same round two ids depending on which app version wrote it, and dedupe would
+// silently stop working.
+function gameId(game) {
+  const res = validateGame(game);
+  return `g_${hash128(canonicalJson(res.ok ? res.game : game))}`;
+}
 
 function loadStore() {
   try {
-    return JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+    return JSON.parse(localStorage.getItem(STORE_KEY_V2)) || {};
   } catch {
     return {};
   }
 }
 function persistStore(obj) {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(obj));
+    localStorage.setItem(STORE_KEY_V2, JSON.stringify(obj));
+    return true;
   } catch (e) {
+    // Never silent: a full quota means the round the teacher just saved is NOT
+    // saved, and they need to know now rather than after closing the tab.
     console.warn('Could not save to browser storage:', e);
+    const v = $('validation');
+    if (v) {
+      v.className = 'msg error';
+      v.textContent = 'This browser refused to save — its storage is full. Use ⬇ Export to get your games out before closing the tab.';
+    }
+    return false;
   }
+}
+
+// One-time lift of the title-keyed v1 library into id-keyed v2.
+function migrateV1() {
+  if (localStorage.getItem(STORE_KEY_V2) !== null) return; // already done
+  let old = null;
+  try {
+    old = JSON.parse(localStorage.getItem(STORE_KEY));
+  } catch {
+    old = null;
+  }
+  const store = {};
+  for (const [title, game] of Object.entries(old || {})) {
+    if (!game || typeof game !== 'object') continue;
+    const g = { ...game, title: game.title || title }; // v1 held the title in the key
+    // Store the NORMALIZED game, not the raw one: the id is derived from the
+    // normalized form, so keeping the raw payload would leave every migrated
+    // entry looking "changed" forever and rewrite the whole library on first
+    // export or sync. A game too broken to validate is kept as-is rather than
+    // dropped — it was already unplayable, but it is not ours to throw away.
+    const res = validateGame(g);
+    const norm = res.ok ? res.game : g;
+    const id = gameId(norm);
+    store[id] = { id, title: norm.title || g.title, clientAt: Date.now(), deleted: 0, version: 0, dirty: 1, game: norm };
+  }
+  persistStore(store);
+}
+
+// Live (non-deleted) entries, sorted by title.
+function libraryEntries() {
+  return Object.values(loadStore())
+    .filter((e) => e && !e.deleted && e.game)
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 const libMeta = (game) => {
@@ -798,28 +914,34 @@ const libMeta = (game) => {
 function renderLibrary() {
   const box = $('library');
   if (!box) return;
-  const store = loadStore();
-  const names = Object.keys(store).sort((a, b) => a.localeCompare(b));
-  if (!names.length) {
+  const entries = libraryEntries();
+  // Same-titled rounds from different machines are a real outcome of merging, so
+  // disambiguate them HERE rather than renaming anything on disk: a render-time
+  // suffix is reversible and lets the teacher see which copy is the fuller one.
+  const seen = new Map();
+  for (const e of entries) seen.set(e.title, (seen.get(e.title) || 0) + 1);
+
+  if (!entries.length) {
     box.innerHTML = '<p class="lib-empty">No saved games yet. Make a New game, or import one below, then Save.</p>';
   } else {
     box.innerHTML = '';
-    for (const n of names) {
+    for (const e of entries) {
+      const label = seen.get(e.title) > 1 ? `${e.title} · #${e.id.slice(2, 6)}` : e.title;
       const item = document.createElement('div');
-      item.className = 'lib-item' + (state.data && state.data.title === n ? ' current' : '');
+      item.className = 'lib-item' + (state.openId === e.id ? ' current' : '');
       item.innerHTML =
-        `<button class="lib-open"><span class="lib-title">${esc(n)}</span>` +
-        `<span class="lib-meta">${esc(libMeta(store[n]))}</span></button>` +
+        `<button class="lib-open"><span class="lib-title">${esc(label)}</span>` +
+        `<span class="lib-meta">${esc(libMeta(e.game))}</span></button>` +
         `<button class="lib-edit" title="Edit">✏️</button>` +
         `<button class="lib-del" title="Delete">🗑</button>`;
-      item.querySelector('.lib-open').addEventListener('click', () => openSaved(n));
-      item.querySelector('.lib-edit').addEventListener('click', () => editSaved(n));
-      item.querySelector('.lib-del').addEventListener('click', () => deleteSaved(n));
+      item.querySelector('.lib-open').addEventListener('click', () => openSaved(e.id));
+      item.querySelector('.lib-edit').addEventListener('click', () => editSaved(e.id));
+      item.querySelector('.lib-del').addEventListener('click', () => deleteSaved(e.id));
       box.appendChild(item);
     }
   }
   const d = $('import-details');
-  if (d && !names.length) d.open = true; // help first-timers find import
+  if (d && !entries.length) d.open = true; // help first-timers find import
   updateSaveButton();
 }
 
@@ -832,10 +954,13 @@ function updateSaveButton() {
     return;
   }
   btn.disabled = false;
-  btn.textContent = loadStore()[state.data.title] ? '💾 Update saved game' : '💾 Save current game';
+  // "Update" only when saving would overwrite in place — i.e. the open game is
+  // still under its original title. Retitling saves a copy (see saveLocal).
+  const open = state.openId && loadStore()[state.openId];
+  btn.textContent = open && !open.deleted && open.title === state.data.title ? '💾 Update saved game' : '💾 Save current game';
 }
 
-// Save the current game into this browser (keyed by title; same title updates).
+// Save the current game into this browser, keyed by a stable content id.
 function saveLocal() {
   const v = $('validation');
   if (!state.data) {
@@ -844,32 +969,262 @@ function saveLocal() {
     return;
   }
   const store = loadStore();
-  store[state.data.title] = state.data;
-  persistStore(store);
+  const open = state.openId && store[state.openId];
+  // Editing an open game updates it in place; RENAMING it saves a new game and
+  // leaves the original untouched — the editor's own hint promises exactly that
+  // ("Rename the title before 💾 Save to keep the original game unchanged").
+  const id = open && !open.deleted && open.title === state.data.title ? state.openId : gameId(state.data);
+  store[id] = {
+    id,
+    title: state.data.title,
+    clientAt: Date.now(),
+    deleted: 0,
+    version: store[id]?.version || 0,
+    dirty: 1,
+    game: state.data,
+  };
+  if (!persistStore(store)) return; // quota error already reported
+  state.openId = id;
   renderLibrary();
+  scheduleSync();
   v.className = 'msg ok';
   v.textContent = `Saved "${state.data.title}" in this browser.`;
 }
 
-function openSaved(name) {
-  const game = loadStore()[name];
-  if (!game) return;
-  loadGameText(JSON.stringify(game), state.players);
+function openSaved(id) {
+  const entry = loadStore()[id];
+  if (!entry || !entry.game) return;
+  loadGameText(JSON.stringify(entry.game), state.players);
+  state.openId = id; // set after loadGameText, which re-renders the library
+  renderLibrary();
   if (!$('editor').classList.contains('hidden')) openEditor(); // refresh editor if open
 }
 
-function editSaved(name) {
-  openSaved(name);
+function editSaved(id) {
+  openSaved(id);
   openEditor();
 }
 
-function deleteSaved(name) {
+// Tombstone rather than drop: the payload is kept so a mis-click stays
+// recoverable, and a delete has to be able to travel to other machines later.
+function deleteSaved(id) {
   const store = loadStore();
-  delete store[name];
-  persistStore(store);
+  const entry = store[id];
+  if (!entry) return;
+  if (!confirm(`Delete "${entry.title}"?`)) return;
+  store[id] = { ...entry, deleted: 1, clientAt: Date.now(), dirty: 1 };
+  if (!persistStore(store)) return;
+  if (state.openId === id) state.openId = null;
   renderLibrary();
+  scheduleSync();
 }
 
+// ---------- Export / import the whole library ----------
+// The only way games leave this browser. Works offline, on file://, and on a
+// static host — and it is the backstop for everything else, so keep it simple.
+
+function exportLibrary() {
+  const games = libraryEntries().map((e) => ({ id: e.id, title: e.title, game: e.game }));
+  const v = $('validation');
+  if (!games.length) {
+    v.className = 'msg error';
+    v.textContent = 'No saved games to export yet.';
+    return;
+  }
+  const payload = { kind: 'password.library', v: 1, exportedAt: new Date().toISOString(), games };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `password-games-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  v.className = 'msg ok';
+  v.textContent = `Exported ${games.length} game${games.length === 1 ? '' : 's'}.`;
+}
+
+// Accepts an export envelope, a bare array of games, a single game, or a raw v1
+// { title: game } dump — so a library pasted out of another browser's
+// localStorage still imports.
+function importLibraryGames(parsed) {
+  if (Array.isArray(parsed)) return parsed.map((game) => ({ game }));
+  if (parsed && Array.isArray(parsed.games)) return parsed.games;
+  if (parsed && Array.isArray(parsed.letters)) return [{ game: parsed }];
+  if (parsed && typeof parsed === 'object') {
+    return Object.entries(parsed).map(([title, game]) => ({ game: { ...game, title: game?.title || title } }));
+  }
+  return [];
+}
+
+function importLibraryText(text) {
+  const v = $('validation');
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    v.className = 'msg error';
+    v.textContent = 'That file is not valid JSON.';
+    return;
+  }
+  const store = loadStore();
+  let added = 0;
+  let updated = 0;
+  let unchanged = 0;
+  let skipped = 0;
+  for (const row of importLibraryGames(parsed)) {
+    const raw = row?.game;
+    const res = raw ? validateGame(raw) : { ok: false };
+    if (!res.ok) {
+      skipped++;
+      continue;
+    }
+    // Re-derive the id from content rather than trusting the file: that is what
+    // makes importing the same library twice a no-op instead of a duplicate.
+    const id = gameId(res.game);
+    const prev = store[id];
+    if (prev && !prev.deleted && canonicalJson(prev.game) === canonicalJson(res.game)) {
+      unchanged++;
+      continue;
+    }
+    store[id] = {
+      id,
+      title: res.game.title,
+      clientAt: Date.now(),
+      deleted: 0,
+      version: prev?.version || 0,
+      dirty: 1,
+      game: res.game,
+    };
+    if (prev) updated++;
+    else added++;
+  }
+  if (!persistStore(store)) return;
+  renderLibrary();
+  scheduleSync();
+  v.className = skipped && !added && !updated ? 'msg error' : 'msg ok';
+  v.textContent =
+    `${added} added, ${updated} updated, ${unchanged} unchanged` +
+    (skipped ? `, ${skipped} skipped (not a valid game).` : '.');
+}
+
+// ---------- Cloud library sync ----------
+// The store layer above is passed in rather than imported by js/library.js, so
+// localStorage stays owned in one place and the sync module stays testable.
+
+const syncDeps = {
+  get origin() {
+    return state.cloudOrigin;
+  },
+  loadStore,
+  persistStore,
+  gameId,
+  hash128,
+  onStatus: renderSyncStatus,
+  // A wrong key does not fail — it opens a different, empty library. Asking here
+  // is the only thing standing between a typo and a library forked in two.
+  confirmAdopt: (n, fp) =>
+    Promise.resolve(
+      confirm(
+        `This key opens a library that has never been used (${fp}).\n\n` +
+          `Start a new cloud library with the ${n} game${n === 1 ? '' : 's'} on this computer?\n\n` +
+          `If you expected to find your games here, choose Cancel and re-check the key — ` +
+          `a mistyped key quietly starts a SECOND library that never merges with the first.`,
+      ),
+    ),
+};
+
+function renderSyncStatus(s = {}) {
+  const el = $('sync-status');
+  if (!el) return;
+  const key = getLibraryKey();
+  if (!key) {
+    el.textContent = 'Not set up — Generate a key here, or paste the one from your other computer.';
+    return;
+  }
+  const fp = s.fp || fingerprint(key, hash128);
+  if (s.state === 'syncing') {
+    el.textContent = `Library ${fp} · syncing…`;
+    return;
+  }
+  if (s.state === 'error') {
+    el.textContent = `Library ${fp} · not synced (${s.error}) — your games are still saved on this laptop.`;
+    return;
+  }
+  if (s.note) {
+    el.textContent = `Library ${fp} · ${s.note}`;
+    return;
+  }
+  const bits = [`Library ${fp}`];
+  if (typeof s.count === 'number') bits.push(`${s.count} game${s.count === 1 ? '' : 's'}`);
+  if (s.at) bits.push('synced just now');
+  if (s.pushed) bits.push(`${s.pushed} sent`);
+  if (s.forked) bits.push(`${s.forked} kept as a copy (changed on two computers)`);
+  if (s.resurrected) bits.push(`${s.resurrected} kept from this laptop`);
+  el.textContent = bits.join(' · ');
+}
+
+async function runSync(manual) {
+  if (isPlayMode) return; // the projector tab never touches the network
+  try {
+    const res = await librarySync(syncDeps, { manual });
+    if (!res.skipped) {
+      renderLibrary();
+      bc?.postMessage({ t: 'library' }); // a sibling setup tab re-reads the store
+    }
+    if (res.error) renderSyncStatus({ state: 'error', error: res.error });
+  } catch (e) {
+    renderSyncStatus({ state: 'error', error: e.message });
+  }
+}
+
+// Called after every local change. Never awaited from a click handler — the
+// "➕ Append" button saves on each press, and a save must never wait on a network.
+function scheduleSync() {
+  if (isPlayMode || !getLibraryKey()) return;
+  syncSoon(syncDeps);
+}
+
+function bindLibrarySync() {
+  if (isPlayMode) return;
+  const input = $('library-key');
+  if (input) input.value = getLibraryKey();
+  renderSyncStatus();
+
+  $('library-generate')?.addEventListener('click', () => {
+    if (getLibraryKey() && !confirm('Replace the key on this computer? Games already in the old library stay there, and this computer will start a new, empty one.')) return;
+    const k = generateKey();
+    setLibraryKey(k);
+    if (input) input.value = k;
+    renderSyncStatus();
+    runSync(true);
+  });
+
+  $('library-copy')?.addEventListener('click', async () => {
+    const k = getLibraryKey();
+    if (!k) return;
+    try {
+      await navigator.clipboard.writeText(k);
+      flash($('library-copy'), 'Copied!');
+    } catch {
+      input?.select(); // clipboard needs a secure context; let them copy by hand
+    }
+  });
+
+  $('library-key')?.addEventListener('change', (e) => {
+    const k = e.target.value.trim().toLowerCase();
+    if (k && !validKey(k)) {
+      renderSyncStatus({ state: 'error', error: 'that key does not look right' });
+      return;
+    }
+    setLibraryKey(k);
+    e.target.value = k;
+    renderSyncStatus();
+    if (k) runSync(true);
+  });
+
+  $('library-sync')?.addEventListener('click', () => runSync(true));
+}
 // ---------- Results history (browser storage) ----------
 // Every finished round is recorded so difficult words can be reviewed later —
 // and turned into a fresh "review round" with one click.
@@ -1054,6 +1409,13 @@ function practiceSession(idx) {
 function bindEditor() {
   $('edit-game').addEventListener('click', () => openEditor(true));
   $('save-local').addEventListener('click', saveLocal);
+  $('export-library')?.addEventListener('click', exportLibrary);
+  $('import-library')?.addEventListener('click', () => $('library-file').click());
+  $('library-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = ''; // let the same file be picked again after a fix
+    if (file) importLibraryText(await file.text());
+  });
   $('editor-add').addEventListener('click', () => $('editor-rows').appendChild(editorRowEl({})));
   $('editor-scaffold').addEventListener('click', scaffoldEditor);
   $('editor-set-prev').addEventListener('click', () => setEditorSet(state.edit.set - 1));
@@ -1390,7 +1752,10 @@ async function initRemoteLink() {
     box.disabled = !info;
   }
 
-  const origin = cloud ? await resolveCloudOrigin() : '';
+  // Resolved even when ☁ is unticked: the saved-games library syncs to this same
+  // Worker origin, and it must not hinge on a phone-remote setting.
+  const origin = await resolveCloudOrigin();
+  state.cloudOrigin = origin;
   const urlInput = $('relay-origin');
   if (urlInput) {
     if (!urlInput.value) urlInput.value = (localStorage.getItem(RELAY_ORIGIN_KEY) || CLOUD_RELAY || '').trim();
@@ -1998,12 +2363,18 @@ if (bc) {
           renderHistory(); // the game tab just recorded a finished round
         }
         updateLiveControls();
+      } else if (m.t === 'library') {
+        // Another setup tab synced or saved. Re-read rather than keep our own
+        // copy, or this tab would later push a stale whole-store over it.
+        renderLibrary();
+        renderSyncStatus();
       }
     }
   };
 }
 
 // ---------- boot ----------
+migrateV1(); // lift a title-keyed v1 library into id-keyed v2 (v1 is left untouched)
 setupScreen();
 applyPrefs(); // restore the teacher's play settings (games never override them)
 bindGameControls();
@@ -2011,6 +2382,10 @@ bindEditor();
 bindAppend();
 renderHistory();
 const remoteReady = initRemoteLink(); // resolves once we know whether the neural server is up
+bindLibrarySync();
+// Only after initRemoteLink has resolved the Worker origin — and never in the
+// projector tab, which must make no network calls mid-lesson.
+if (!isPlayMode) remoteReady.then(() => runSync(false)).catch(() => {});
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
 $('auto-read')?.addEventListener('change', (e) => {
   state.autoRead = e.target.checked;
