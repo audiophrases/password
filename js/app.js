@@ -1143,6 +1143,15 @@ function renderSyncStatus(s = {}) {
     return;
   }
   const fp = s.fp || fingerprint(key, hash128);
+  // The origin probe only finds a relay when the page IS the Worker, or when a
+  // Worker URL has been saved. Running `node server.js` (the usual way to teach)
+  // is neither, so say plainly why nothing is syncing instead of looking idle.
+  if (!state.cloudOrigin) {
+    el.textContent =
+      `Library ${fp} · no cloud relay set on this computer — paste your Worker URL in the ☁ Phone remote box below ` +
+      `(or run install.bat). Your games are saved on this laptop meanwhile.`;
+    return;
+  }
   if (s.state === 'syncing') {
     el.textContent = `Library ${fp} · syncing…`;
     return;
@@ -1168,7 +1177,8 @@ async function runSync(manual) {
   if (isPlayMode) return; // the projector tab never touches the network
   try {
     const res = await librarySync(syncDeps, { manual });
-    if (!res.skipped) {
+    if (res.skipped) renderSyncStatus(); // e.g. no relay yet — explain, don't sit silent
+    else {
       renderLibrary();
       bc?.postMessage({ t: 'library' }); // a sibling setup tab re-reads the store
     }
