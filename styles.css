@@ -344,6 +344,9 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
   box-shadow: 0 8px 30px rgba(20, 35, 59, .3);
 }
 .reveal-answer small { font-size: .38em; font-weight: 700; opacity: .85; text-transform: uppercase; letter-spacing: 1px; }
+/* same banner in green, flashed after a correct answer when the teacher has
+   "flash the word" on (the turn carries on underneath — it just fades out) */
+.reveal-answer.correct { background: var(--ok); }
 
 /* live-settings confirmation toast */
 .toast {

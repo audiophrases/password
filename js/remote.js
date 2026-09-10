@@ -102,6 +102,7 @@ function fillSettings(s) {
   }
   if (typeof s.durationSec === 'number') $('rs-duration').value = s.durationSec;
   if (typeof s.autoRead === 'boolean') $('rs-autoread').checked = s.autoRead;
+  if (typeof s.showCorrectWord === 'boolean') $('rs-showword').checked = s.showCorrectWord;
   // Neural voices for the game's language (e.g. Catalan: Enric / Joana). The
   // host sends an empty list when the neural server is off — hide the picker.
   if (Array.isArray(s.voices)) {
@@ -141,6 +142,7 @@ $('rs-apply').addEventListener('click', () => {
       ttsRate: parseFloat($('rs-rate').value),
       durationSec: Math.max(0, Math.floor(+$('rs-duration').value) || 0),
       autoRead: $('rs-autoread').checked,
+      showCorrectWord: $('rs-showword').checked,
       voiceName: $('rs-voice').value || undefined, // undefined = leave the voice alone
       // keep index order — the host matches names to players by position
       players: [...document.querySelectorAll('#rs-players .rs-name')].map((i) => ({ name: i.value.trim() })),

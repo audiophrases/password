@@ -37,6 +37,7 @@ const state = {
   camera: new Camera(),
   cameraOn: false,
   autoRead: true, // read clues aloud by default (checkbox in Play settings)
+  showCorrectWord: true, // flash the word on the projected screen once it's guessed right
   clueMuted: false, // remote 🔇: suppress ALL automatic read-aloud so the teacher reads live
   ttsRate: 0.93, // read-aloud speed multiplier (1 = normal); slightly slow suits ESL
   voiceName: null,
@@ -93,6 +94,39 @@ function playAnswerFx() {
   fxSeen = lr;
   if (lr.state === 'correct') playFx('correct');
   else if (lr.state === 'wrong') playFx('wrong');
+}
+
+// ---------- Correct-answer word flash ----------
+// A wrong answer holds the board still while it reveals the word; a correct one
+// doesn't — the turn carries straight on to the next letter. So this flash is
+// purely a timed overlay: it shows the word that was just won for a beat and
+// fades itself out, without touching the game's pacing. Off by the teacher's
+// "flash the word" setting, in which case a correct word never reaches the
+// projected screen at all.
+const CORRECT_FLASH_MS = 1400;
+let flashSeen = null; // lastResolved already flashed — 'update' also fires for clock/rotation changes
+let flashTimer = null;
+
+function hideAnswerBanner() {
+  clearTimeout(flashTimer);
+  const banner = $('reveal-answer');
+  banner.classList.add('hidden');
+  banner.classList.remove('correct');
+}
+
+function flashCorrectWord() {
+  const lr = state.game?.lastResolved;
+  if (!lr || lr === flashSeen) return;
+  flashSeen = lr;
+  if (lr.state !== 'correct' || !state.showCorrectWord) return;
+  const e = state.game.entryFor(lr.playerIndex, lr.letter);
+  if (!e) return;
+  const banner = $('reveal-answer');
+  banner.innerHTML = `<small>${esc(lr.letter)} ✓</small>${esc(e.answer)}`;
+  banner.classList.add('correct');
+  banner.classList.remove('hidden');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(hideAnswerBanner, CORRECT_FLASH_MS);
 }
 
 // ---------- Setup screen ----------
@@ -1085,6 +1119,7 @@ function savePrefs() {
         durationSec: playDurationValue(),
         ttsRate: state.ttsRate,
         autoRead: state.autoRead,
+        showCorrectWord: state.showCorrectWord,
       })
     );
   } catch {
@@ -1111,6 +1146,16 @@ function applyPrefs() {
     state.autoRead = p.autoRead;
     $('auto-read').checked = p.autoRead;
   }
+  if (typeof p.showCorrectWord === 'boolean') setShowCorrectWord(p.showCorrectWord);
+}
+
+// One place to move the setting + its checkbox, so the setup tab, the game tab
+// and the phone's apply-settings all end up in the same state.
+function setShowCorrectWord(on) {
+  state.showCorrectWord = !!on;
+  const box = $('show-correct-word');
+  if (box) box.checked = state.showCorrectWord;
+  if (!state.showCorrectWord) hideAnswerBanner(); // switched off mid-flash: take it down now
 }
 
 // Snapshot the settings that can be pushed to (or launched into) a live game.
@@ -1123,6 +1168,7 @@ function currentSettings() {
     voiceName: state.voiceName,
     useNeural: state.useNeural,
     autoRead: state.autoRead,
+    showCorrectWord: state.showCorrectWord,
     ttsRate: state.ttsRate,
     players: state.players.map((p) => ({ name: p.name, color: p.color })),
   };
@@ -1197,6 +1243,7 @@ function applyLiveSettings(s = {}) {
     state.autoRead = s.autoRead;
     $('auto-read').checked = s.autoRead;
   }
+  if (typeof s.showCorrectWord === 'boolean') setShowCorrectWord(s.showCorrectWord);
   if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural && state.neuralAvailable && !state.neuralBroken;
   if (typeof s.ttsRate === 'number') setTtsRate(s.ttsRate);
 
@@ -1503,6 +1550,7 @@ function pushRemoteState() {
       strictness: g.data.settings.strictness,
       ttsRate: state.ttsRate,
       autoRead: state.autoRead,
+      showCorrectWord: state.showCorrectWord,
       durationSec: g.duration,
       players: g.players.map((pl) => ({ name: pl.name, color: pl.color })),
       ...remoteVoiceChoices(g.data.langCode),
@@ -1570,6 +1618,9 @@ function startGame(players) {
   fxSeen = null;
   game.addEventListener('update', playAnswerFx);
   game.addEventListener('reveal', playAnswerFx);
+  // after `render`, which clears the banner as part of repainting the board
+  flashSeen = null;
+  game.addEventListener('update', flashCorrectWord);
 
   applyClueHidden(true); // audio-only by default; teacher can reveal with 👁 / H
   game.start();
@@ -1612,7 +1663,7 @@ function renderBoard() {
   $('suggestion').className = 'suggestion';
   $('suggestion').textContent = '';
   $('heard').textContent = '';
-  $('reveal-answer').classList.add('hidden'); // answer banner lives only during a wrong-reveal
+  hideAnswerBanner(); // the banner belongs to the answer just judged, not to the next letter
 }
 
 function render() {
@@ -1909,6 +1960,7 @@ function bootPlay() {
   const s = payload.settings || {};
   state.autoRead = !!s.autoRead;
   $('auto-read').checked = state.autoRead;
+  if (typeof s.showCorrectWord === 'boolean') setShowCorrectWord(s.showCorrectWord);
   if (typeof s.ttsRate === 'number') setTtsRate(s.ttsRate);
   if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural;
   if (s.voiceName) {
@@ -1962,6 +2014,10 @@ const remoteReady = initRemoteLink(); // resolves once we know whether the neura
 $('strictness-out') && $('strictness').addEventListener('input', (e) => ($('strictness-out').textContent = e.target.value));
 $('auto-read')?.addEventListener('change', (e) => {
   state.autoRead = e.target.checked;
+  savePrefs();
+});
+$('show-correct-word')?.addEventListener('change', (e) => {
+  setShowCorrectWord(e.target.checked);
   savePrefs();
 });
 $('apply-live')?.addEventListener('click', applyToLiveGame);
