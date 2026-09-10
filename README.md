@@ -71,7 +71,10 @@ announced with the letter in the game's language — e.g. *"Begins with the lett
 
    Saved games persist across sessions in this browser. Renaming a game in the editor saves a
    *copy* and leaves the original alone, so a round is never overwritten by accident.
-3. **Add players, pick a judging mode, press Start.**
+3. **Add players, pick a judging mode, press Start — twice.** The first ▶ Start opens the game
+   tab and puts the circles on screen with the clocks still and nothing read aloud, so the class
+   can settle and you can get in position. The second ▶ Start (the button on the game screen,
+   `Enter`, or ▶ Start on the phone) starts the timer and reads the first clue.
 
 ### In-game keys (the teacher is always the final judge)
 
@@ -84,6 +87,7 @@ announced with the letter in the game's language — e.g. *"Begins with the lett
 | `Enter` | confirm the speech suggestion |
 | `H` | hide/show the written definition (audio-only mode) |
 | `F` | fullscreen (projector) · `P` pause |
+| `Enter` / `Space` | *before the round begins:* start it (the board is already up) |
 
 ## Speech recognition strategy (the hard part)
 
@@ -122,7 +126,10 @@ laptop must be on the **same network** — same Wi-Fi, or join the laptop to you
 You get big **Correct / Pass / Wrong** buttons, **hold-to-talk**, and Start / Pause / Clue /
 Camera / Fullscreen / Exit — plus the current player, letter, clue, **the expected answer**,
 score and timer mirrored on the phone. So you can read the clue, see the answer, and judge
-Correct/Wrong from your phone without looking at the projector. Presses travel phone
+Correct/Wrong from your phone without looking at the projector. **▶ Start takes two presses**: the
+first brings the circles up on the projector (clocks still, nothing read aloud), the second starts
+the round — the button turns green in between. **🔇 Mute** works before the round as well, so you
+can claim the clues as yours to read out before the very first one is spoken. Presses travel phone
 → laptop over the local network in a few milliseconds; **no internet needed.** After that one
 URL the laptop is untouched: students watch the projected circle while you drive from the phone.
 

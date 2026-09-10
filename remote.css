@@ -130,5 +130,7 @@ body.offline .status::before { content: 'Reconnecting… '; }
   border-radius: 12px; padding: 12px 6px; font-size: 14px; font-weight: 700;
 }
 .row2 button:active { background: #e8eef9; }
+/* ▶ Start while the board is up and waiting for the second press */
+.row2 button.armed { background: var(--ok, #1f9d55); border-color: var(--ok, #1f9d55); color: #fff; }
 
 body.offline .pad, body.offline .cluerow, body.offline .timebank-wrap, body.offline .row2, body.offline .rset { opacity: .45; pointer-events: none; }

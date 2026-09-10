@@ -348,6 +348,22 @@ body.clue-hidden #clue { display: none; } /* audio-only: hide the whole clue box
    "flash the word" on (the turn carries on underneath — it just fades out) */
 .reveal-answer.correct { background: var(--ok); }
 
+/* two-step start: the board is up, the clocks are still, nothing has been read */
+.ready {
+  position: absolute; bottom: 84px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 9;
+  background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow);
+  border-radius: 14px; padding: 16px 24px; text-align: center;
+  max-width: 720px; width: calc(100% - 40px);
+}
+.ready small { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.ready-go { font-size: 20px; padding: 12px 30px; }
+/* the round hasn't begun: no clue box and no speech feedback yet (the control
+   bar stays, so 📷/⛶/Exit still work while the class settles) */
+body.armed #clue,
+body.armed .heard,
+body.armed .suggestion { display: none; }
+
 /* live-settings confirmation toast */
 .toast {
   position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%);

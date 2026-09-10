@@ -58,6 +58,8 @@ const state = {
   neuralBroken: false,
   neuralFailStreak: 0, // consecutive failures; 2 in a row trips neuralBroken (one blip shouldn't)
   neuralRetryAt: 0, // once broken, timestamp to quietly try neural again instead of staying broken all game
+  armed: false, // board is up but the round hasn't begun — the second ▶ Start begins it
+  playWin: null, // the game tab this control panel opened (so ▶ Start refocuses it)
   edit: { set: 0, sets: 1 },
   lastSuggestion: null,
   link: null,
@@ -1541,6 +1543,7 @@ function currentSettings() {
     useNeural: state.useNeural,
     autoRead: state.autoRead,
     showCorrectWord: state.showCorrectWord,
+    clueMuted: state.clueMuted, // 🔇 set on the phone before the round: start muted
     ttsRate: state.ttsRate,
     players: state.players.map((p) => ({ name: p.name, color: p.color })),
   };
@@ -1548,16 +1551,28 @@ function currentSettings() {
 
 // Launch the round in a NEW tab (so this tab stays a control panel). We hand the
 // round off through localStorage, then open ./?play=1 which reads it back. Inside
-// the game tab itself, "start" just (re)plays here.
+// the game tab itself, "start" walks the two steps: board up, then round on.
 function beginGame() {
   if (!state.data) return;
   if (isPlayMode) {
+    if (state.armed) {
+      launchRound(); // second ▶ Start: clocks run, clue #1 is read
+      return;
+    }
     if ($('game').classList.contains('hidden')) {
       // Fewer players than word circles: fold the extra circles' words in via
       // a fresh mix each time, instead of just leaving them unused.
       if (state.players.length < gameSetCount(state.data)) mixSets(state.data);
-      startGame(state.players);
+      startGame(state.players); // first ▶ Start: circles up, nothing running yet
     }
+    return;
+  }
+  // The control panel only ever opens the game tab; the second ▶ Start belongs to
+  // that tab, which is where it begins the round. So never open a second tab for
+  // it — bring the one that is already there forward instead.
+  if (state.launchedPlay || state.gameRunning) {
+    if (state.playWin && !state.playWin.closed) state.playWin.focus();
+    else flash($('start-game'), '▶ Already open in the game tab');
     return;
   }
   const data = JSON.parse(JSON.stringify(state.data));
@@ -1573,9 +1588,13 @@ function beginGame() {
   } catch (e) {
     console.warn('Could not hand off the game:', e);
   }
-  state.launchedPlay = true;
+  // Only count it as launched if the tab actually opened — a blocked popup must
+  // not leave ▶ Start permanently dead here. The window is named, so a game tab
+  // left open from an earlier round is reused (and reloaded with this handoff)
+  // instead of piling up a second projector tab.
+  state.playWin = window.open('./?play=1', 'password-game');
+  state.launchedPlay = !!state.playWin;
   updateLiveControls();
-  window.open('./?play=1', '_blank');
 }
 
 // Setup tab: show the "apply to live game" button only while a game tab is open.
@@ -1616,6 +1635,7 @@ function applyLiveSettings(s = {}) {
     $('auto-read').checked = s.autoRead;
   }
   if (typeof s.showCorrectWord === 'boolean') setShowCorrectWord(s.showCorrectWord);
+  if (typeof s.clueMuted === 'boolean') setClueMuted(s.clueMuted);
   if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural && state.neuralAvailable && !state.neuralBroken;
   if (typeof s.ttsRate === 'number') setTtsRate(s.ttsRate);
 
@@ -1798,6 +1818,7 @@ async function initRemoteLink() {
     onPeers: (m) => {
       state.remotes = m.remotes;
       renderRemoteInfo();
+      pushRemoteState(); // a phone just joined: paint it with the real 🔇 / ▶ state
     },
     onStatus: (s) => {
       if (s === 'open') pushRemoteState();
@@ -1856,22 +1877,21 @@ function handleRemoteCommand(action, msg) {
     case 'pass': if (inGame) g.pass(); break;
     case 'talk-start': if (inGame) startTalk(); break;
     case 'talk-stop': stopTalk(); break;
-    case 'read': if (inGame) readCurrentClue(); break;
-    case 'mute': // suppress automatic read-aloud so the teacher can read the clues live
-      if (inGame) {
-        state.clueMuted = !state.clueMuted;
-        if (state.clueMuted) stopNarration();
-        pushRemoteState(); // reflect the new state on the phone's 🔇 button
-      }
+    case 'read': if (inGame && !state.armed) readCurrentClue(); break;
+    // Suppress automatic read-aloud so the teacher can read the clues live. Works
+    // on the setup screen too, so the choice can be made before the round starts.
+    case 'mute':
+      setClueMuted(!state.clueMuted);
+      pushRemoteState(); // reflect the new state on the phone's 🔇 button
       break;
     case 'add-time': if (inGame) g.addTime(msg?.playerIndex, msg?.seconds); break; // emits 'tick' → HUD + phones repaint
-    case 'toggle-clue': if (inGame) toggleClue(); break;
+    case 'toggle-clue': if (inGame && !state.armed) toggleClue(); break;
     case 'camera': if (inGame) toggleCamera(); break;
     case 'fullscreen': toggleFullscreen($('game')); break;
     case 'start': beginGame(); break;
     case 'exit': if (inGame) endToSetup(); break;
     case 'pause':
-      if (inGame) {
+      if (inGame && !state.armed) {
         g.togglePause();
         $('pause').textContent = g.paused ? '▶ Resume' : '⏸ Pause';
         pushRemoteState();
@@ -1889,7 +1909,7 @@ function pushRemoteState() {
   const g = state.game;
   const inGame = g && !$('game').classList.contains('hidden');
   if (!inGame) {
-    state.link.send({ t: 'state', screen: 'setup', loaded: !!state.data, title: state.data?.title || null });
+    state.link.send({ t: 'state', screen: 'setup', loaded: !!state.data, title: state.data?.title || null, muted: state.clueMuted });
     return;
   }
   const p = g.active;
@@ -1908,6 +1928,7 @@ function pushRemoteState() {
     answer: e ? e.answer : '',
     accept: e ? (e.accept || []).join(', ') : '',
     paused: g.paused,
+    armed: !!state.armed, // board up, clocks still — waiting for the second ▶ Start
     muted: state.clueMuted,
     suggestion: state.lastSuggestion || '',
     // every player's clock, for the phone's per-player "add time" buttons —
@@ -1998,13 +2019,40 @@ function startGame(players) {
   game.addEventListener('update', flashCorrectWord);
 
   applyClueHidden(true); // audio-only by default; teacher can reveal with 👁 / H
-  game.start();
-  render();
+  armRound();
+}
+
+// Step one of the two-step start: put the board on the projector — circles,
+// names, full clocks — while the round stays still. The timer is not running and
+// no clue is read, so the class can settle and the teacher can get in position.
+function armRound() {
+  state.armed = true;
+  document.body.classList.add('armed');
+  $('ready')?.classList.remove('hidden');
+  renderBoard(); // circles + HUD only: no renderClue(), so nothing is narrated
 
   // Start with the control bar hidden so it stays out of the projected picture;
   // dropping the mouse to the bottom edge summons it.
   state.autohide?.hide();
   announceStatus();
+}
+
+// Step two: the second ▶ Start. Clocks run and clue #1 is read.
+function launchRound() {
+  if (!state.game || !state.armed) return;
+  state.armed = false;
+  document.body.classList.remove('armed');
+  $('ready')?.classList.add('hidden');
+  state.game.start(); // emits 'update' → render() → the first clue and its narration
+  state.autohide?.hide();
+  announceStatus();
+}
+
+// One place to move the 🔇 mute, so the phone, the handed-off round and the
+// running game all agree — and so muting silences whatever is being read now.
+function setClueMuted(on) {
+  state.clueMuted = !!on;
+  if (state.clueMuted) stopNarration();
 }
 
 const CORNERS = ['tl', 'tr', 'bl', 'br', 'ml', 'mr'];
@@ -2113,7 +2161,7 @@ function toggleClue() {
   const hidden = !document.body.classList.contains('clue-hidden');
   applyClueHidden(hidden);
   // revealing to audio-only mid-letter: speak the current clue right away
-  if (hidden && !state.clueMuted && state.game && !$('game').classList.contains('hidden')) readCurrentClue();
+  if (hidden && !state.clueMuted && !state.armed && state.game && !$('game').classList.contains('hidden')) readCurrentClue();
 }
 
 function renderClue() {
@@ -2169,10 +2217,12 @@ function stopTalk() {
 }
 
 function bindGameControls() {
+  $('ready-start')?.addEventListener('click', launchRound);
   $('btn-correct').addEventListener('click', () => state.game.correct());
   $('btn-wrong').addEventListener('click', () => state.game.wrong());
   $('btn-pass').addEventListener('click', () => state.game.pass());
   $('pause').addEventListener('click', () => {
+    if (state.armed) return;
     state.game.togglePause();
     $('pause').textContent = state.game.paused ? '▶ Resume' : '⏸ Pause';
   });
@@ -2198,6 +2248,17 @@ function bindGameControls() {
   document.addEventListener('keydown', (e) => {
     if ($('game').classList.contains('hidden')) return;
     if (document.activeElement === $('type-answer')) return;
+    // Board up, round not begun: every judging key would be meaningless, so the
+    // only keys that do anything are the ones that begin it.
+    if (state.armed) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        launchRound();
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen($('game'));
+      }
+      return;
+    }
     switch (e.key.toLowerCase()) {
       case 'c': state.game.correct(); break;
       case 'w': state.game.wrong(); break;
@@ -2310,6 +2371,9 @@ function showResults() {
 
 function endToSetup() {
   stopNarration();
+  state.armed = false;
+  document.body.classList.remove('armed');
+  $('ready')?.classList.add('hidden');
   recordSession(state.game, true); // early exit: keep what was attempted (no-op if already saved)
   stopTalk();
   state.camera.stop($('cam'));
@@ -2322,7 +2386,8 @@ function endToSetup() {
   pushRemoteState();
 }
 
-// Read a handed-off round from the setup tab and start playing immediately.
+// Read a handed-off round from the setup tab and put the board up. The round
+// itself waits for the second ▶ Start (see armRound).
 function bootPlay() {
   let payload = null;
   try {
@@ -2336,6 +2401,7 @@ function bootPlay() {
   state.autoRead = !!s.autoRead;
   $('auto-read').checked = state.autoRead;
   if (typeof s.showCorrectWord === 'boolean') setShowCorrectWord(s.showCorrectWord);
+  if (typeof s.clueMuted === 'boolean') setClueMuted(s.clueMuted);
   if (typeof s.ttsRate === 'number') setTtsRate(s.ttsRate);
   if (typeof s.useNeural === 'boolean') state.useNeural = s.useNeural;
   if (s.voiceName) {
@@ -2409,6 +2475,9 @@ $('apply-live')?.addEventListener('click', applyToLiveGame);
 
 if (isPlayMode) {
   document.body.classList.add('play-mode');
+  // Closing the game tab hands ▶ Start back to the control panel — otherwise it
+  // would keep believing a game tab is open and refuse to launch another.
+  window.addEventListener('pagehide', () => bc?.postMessage({ t: 'status', running: false, title: state.data?.title || '' }));
   // Hold the first clue until the neural probe finishes, otherwise clue #1 is
   // narrated with the browser fallback (robotic) before neural is known available
   // — and only clue #2 onward would get the neural voice. Cap the wait so a

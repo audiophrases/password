@@ -66,6 +66,7 @@ export class Game extends EventTarget {
   }
 
   togglePause() {
+    if (!this.running) return; // nothing to pause before the round begins (or after it ends)
     this.paused = !this.paused;
     this.emit('update');
   }
@@ -169,7 +170,7 @@ export class Game extends EventTarget {
   correct() {
     const p = this.active;
     const letter = this.currentLetter;
-    if (!letter || p.done || this._revealing) return;
+    if (!letter || p.done || !this.running || this._revealing) return;
     p.results[letter] = 'correct';
     this.lastResolved = { letter, playerIndex: this.activeIndex, state: 'correct' };
     p.queue.shift();
@@ -182,7 +183,7 @@ export class Game extends EventTarget {
   wrong() {
     const p = this.active;
     const letter = this.currentLetter;
-    if (!letter || p.done || this._revealing) return;
+    if (!letter || p.done || !this.running || this._revealing) return;
     p.results[letter] = 'wrong';
     this.lastResolved = { letter, playerIndex: this.activeIndex, state: 'wrong' };
     p.queue.shift();
@@ -194,7 +195,7 @@ export class Game extends EventTarget {
   pass() {
     const p = this.active;
     const letter = this.currentLetter;
-    if (!letter || p.done || this._revealing) return;
+    if (!letter || p.done || !this.running || this._revealing) return;
     if (p.results[letter] === 'pending') p.results[letter] = 'passed';
     this.lastResolved = { letter, playerIndex: this.activeIndex, state: 'passed' };
     p.queue.push(p.queue.shift());

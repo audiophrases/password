@@ -154,8 +154,26 @@ $('rs-apply').addEventListener('click', () => {
   setTimeout(() => (btn.textContent = '⚡ Apply to game'), 1200);
 });
 
+// 🔇 works before the round too, so paint it from every state — including the
+// setup screen, where the teacher decides whether clue #1 gets read at all.
+function renderMute(muted) {
+  $('mute').classList.toggle('on', !!muted);
+  $('mute').textContent = muted ? '🔇 Muted' : '🔇 Mute';
+}
+
+// ▶ Start takes two presses: the first puts the circles on the projector with the
+// clocks still, the second sets the round running. Light the button while the
+// board is waiting so it's clear a second press is expected.
+function renderStart(armed) {
+  const b = $('r-start');
+  b.classList.toggle('armed', !!armed);
+  b.textContent = armed ? '▶ Start now' : '▶ Start';
+}
+
 function applyState(m) {
   setOnline(true); // state arrived → the socket is open → keep the controls live
+  renderMute(m.muted);
+  renderStart(m.armed);
   if (m.screen === 'setup') {
     $('r-player').textContent = 'Setup';
     $('r-player').style.color = '';
@@ -163,7 +181,9 @@ function applyState(m) {
     $('r-score').textContent = '';
     $('r-letter').textContent = '';
     $('r-kind').textContent = '';
-    $('r-clue').textContent = m.loaded ? `Loaded: ${m.title} — press ▶ Start` : 'Load a game on the laptop first.';
+    $('r-clue').textContent = m.loaded
+      ? `Loaded: ${m.title} — press ▶ Start to put the circles up, then ▶ Start again to begin.`
+      : 'Load a game on the laptop first.';
     $('r-answer').textContent = '';
     $('r-accept').textContent = '';
     $('r-sugg').textContent = '';
@@ -179,14 +199,13 @@ function applyState(m) {
   $('r-clue').textContent = m.clue || '';
   $('r-answer').textContent = m.answer || '';
   $('r-accept').textContent = m.accept ? ` · also: ${m.accept}` : '';
-  $('r-sugg').textContent = m.paused
+  $('r-sugg').textContent = m.armed
+    ? '▶ board is up — press Start again to begin'
+    : m.paused
     ? '⏸ paused'
     : m.suggestion
     ? `speech suggests: ${m.suggestion === 'wrong' ? 'wrong' : 'correct'}`
     : '';
-  // Mute toggle: lit while the game's automatic read-aloud is off.
-  $('mute').classList.toggle('on', !!m.muted);
-  $('mute').textContent = m.muted ? '🔇 Muted' : '🔇 Mute';
   renderTimebank(m.roster);
   fillSettings(m.settings);
 }
