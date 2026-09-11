@@ -1173,6 +1173,14 @@ function renderSyncStatus(s = {}) {
   if (s.forked) bits.push(`${s.forked} kept as a copy (changed on two computers)`);
   if (s.resurrected) bits.push(`${s.resurrected} kept from this laptop`);
   el.textContent = bits.join(' · ');
+  // Name what could not go up. Everything else has synced — these are still
+  // saved on this laptop, and ⬇ Export always gets them out.
+  if (s.rejected?.length) {
+    el.textContent +=
+      ` · ${s.rejected.length} could not be uploaded: ` +
+      s.rejected.map((r) => `“${r.title || r.id}” (${r.reason})`).join('; ') +
+      '. Still saved on this laptop.';
+  }
 }
 
 async function runSync(manual) {

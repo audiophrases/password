@@ -156,6 +156,7 @@ export async function sync(deps, { manual = false } = {}) {
   const dirty = Object.values(store).filter((e) => e && e.dirty);
   let pushed = 0;
   let forked = 0;
+  let rejected = [];
   if (dirty.length) {
     const out = dirty.slice(0, 200).map((e) => ({
       id: e.id,
@@ -170,6 +171,10 @@ export async function sync(deps, { manual = false } = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ games: out }),
     });
+    // Rounds the server could not store. They stay dirty on purpose, so fixing
+    // one (shrinking it, repairing it in the editor) syncs it on the next pass —
+    // but they must be named, or the library looks stuck for no visible reason.
+    rejected = res.rejected || [];
     for (const a of res.applied) {
       if (store[a.id]) {
         store[a.id] = { ...store[a.id], version: a.version, dirty: 0 };
@@ -206,8 +211,17 @@ export async function sync(deps, { manual = false } = {}) {
 
   persistStore(store);
   writeCursor(fp, since);
-  onStatus?.({ state: 'idle', fp, at: Date.now(), pushed, forked, resurrected, count: Object.values(store).filter((e) => e && !e.deleted && e.game).length });
-  return { pushed, forked, resurrected };
+  onStatus?.({
+    state: 'idle',
+    fp,
+    at: Date.now(),
+    pushed,
+    forked,
+    resurrected,
+    rejected,
+    count: Object.values(store).filter((e) => e && !e.deleted && e.game).length,
+  });
+  return { pushed, forked, resurrected, rejected };
 }
 
 // Saves fire per keystroke-ish (the "➕ Append" button calls saveLocal on every

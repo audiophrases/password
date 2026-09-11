@@ -24,7 +24,10 @@ import { DurableObject } from 'cloudflare:workers';
 // ids keep matching what is stored here.
 import { validateGame } from '../js/ai.js';
 
-const MAX_GAME_BYTES = 64 * 1024; // one round is ~4 KB; 64 KB is a runaway guard
+// A plain 26-letter round is ~4 KB, but "➕ Add circles" appends a word set per
+// player, so a round reworked over a year is legitimately far bigger. This is a
+// runaway guard, not a quota — storage is the cheapest thing here.
+const MAX_GAME_BYTES = 512 * 1024;
 const MAX_BATCH = 200;
 const MAX_TITLE = 200;
 const MAX_ID = 128;
@@ -143,27 +146,38 @@ export class Library extends DurableObject {
       const games = body && Array.isArray(body.games) ? body.games : null;
       if (!games) return jsonResponse({ error: 'Expected { games: [...] }' }, 400);
       if (games.length > MAX_BATCH) return jsonResponse({ error: `At most ${MAX_BATCH} games per request.` }, 413);
+      // Triage, never refuse the batch. Rejecting the whole push because ONE
+      // round is unusable strands the entire library — which is the opposite of
+      // the point. Store what is good and report the rest back by name.
+      const good = [];
+      const rejected = [];
       for (const g of games) {
-        if (!g || typeof g.id !== 'string' || !g.id || g.id.length > MAX_ID) {
-          return jsonResponse({ error: 'Each game needs a string id.' }, 400);
-        }
-        if (typeof g.title !== 'string' || g.title.length > MAX_TITLE) {
-          return jsonResponse({ error: `Title must be a string of at most ${MAX_TITLE} characters.` }, 400);
-        }
-        if (g.deleted) continue; // a tombstone carries no game to check
-        if (JSON.stringify(g.game ?? null).length > MAX_GAME_BYTES) {
-          return jsonResponse({ error: 'That game is too large.' }, 413);
-        }
-        // Never store what the client sent unchecked: normalize it here so a
-        // stored round is always playable and always in the canonical shape.
-        const res = validateGame(g.game);
-        if (!res.ok) return jsonResponse({ error: `"${g.title}": ${res.errors.slice(0, 3).join(' ')}` }, 400);
-        g.game = res.game;
+        const reason = checkGame(g);
+        if (reason) rejected.push({ id: g?.id ?? null, title: typeof g?.title === 'string' ? g.title : null, reason });
+        else good.push(g);
       }
-      return jsonResponse(this.push(games));
+      return jsonResponse({ ...this.push(good), rejected });
     }
     return jsonResponse({ error: 'Method not allowed' }, 405);
   }
+}
+
+// Returns a human-readable reason the round cannot be stored, or null if it can.
+// Normalizes g.game in place so what gets stored is always the canonical shape.
+function checkGame(g) {
+  if (!g || typeof g.id !== 'string' || !g.id || g.id.length > MAX_ID) return 'it has no usable id';
+  if (typeof g.title !== 'string' || g.title.length > MAX_TITLE) {
+    return `its title is longer than ${MAX_TITLE} characters`;
+  }
+  if (g.deleted) return null; // a tombstone carries no game to check
+  const size = JSON.stringify(g.game ?? null).length;
+  if (size > MAX_GAME_BYTES) {
+    return `it is ${Math.round(size / 1024)} KB, over the ${Math.round(MAX_GAME_BYTES / 1024)} KB limit`;
+  }
+  const res = validateGame(g.game);
+  if (!res.ok) return res.errors.slice(0, 2).join(' ');
+  g.game = res.game;
+  return null;
 }
 
 function jsonResponse(body, status = 200) {
