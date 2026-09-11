@@ -1,0 +1,169 @@
+/* student.css — the play-only student page. Rides on styles.css for the circle,
+   chips, buttons and messages; this file only lays out the student's screens.
+   Chromebook-first: big touch targets, one column, nothing that needs a mouse. */
+
+body.student {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 1rem clamp(0.75rem, 3vw, 1.5rem) 3rem;
+}
+
+.s-card {
+  text-align: center;
+  padding-top: 2rem;
+}
+
+.s-card h1 {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.4rem, 5vw, 2rem);
+}
+
+.s-lead {
+  color: #555;
+  margin: 0 auto 1.2rem;
+  max-width: 32rem;
+  line-height: 1.5;
+}
+
+.s-joinrow,
+.s-answerrow {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.s-joinrow input {
+  font-size: 1.5rem;
+  letter-spacing: 0.18em;
+  text-align: center;
+  width: 9ch;
+  text-transform: lowercase;
+}
+
+.s-name {
+  display: block;
+  margin: 0 auto 1.2rem;
+  max-width: 20rem;
+  color: #555;
+}
+
+.s-name input {
+  display: block;
+  width: 100%;
+  margin-top: 0.3rem;
+  font-size: 1rem;
+}
+
+.btn.s-big {
+  font-size: 1.25rem;
+  padding: 0.7rem 2.2rem;
+}
+
+/* --- playing --- */
+
+.s-circle-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem 0 1rem;
+}
+
+.s-circle-wrap .circle {
+  width: min(78vw, 22rem);
+  height: min(78vw, 22rem);
+}
+
+.s-hud {
+  text-align: center;
+  margin-bottom: 0.8rem;
+}
+
+.s-letter {
+  font-size: 2.4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #e8632c;
+}
+
+.s-clue {
+  font-size: clamp(1rem, 3.4vw, 1.3rem);
+  line-height: 1.45;
+  margin: 0.4rem auto 0;
+  max-width: 34rem;
+}
+
+.s-answerrow input {
+  font-size: 1.15rem;
+  flex: 1 1 14rem;
+  max-width: 22rem;
+}
+
+/* Held-down microphone: obvious enough to see at arm's length. */
+#s-talk.listening {
+  background: #e8632c;
+  border-color: #e8632c;
+  color: #fff;
+}
+
+.s-controls {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 0.8rem;
+  flex-wrap: wrap;
+}
+
+#s-feedback {
+  text-align: center;
+  min-height: 1.5em;
+  font-size: 1.05rem;
+}
+
+/* --- results --- */
+
+.s-score {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0.2rem 0 1.2rem;
+}
+
+.s-review {
+  text-align: left;
+  max-width: 34rem;
+  margin: 0 auto 1.5rem;
+}
+
+.s-review h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.5rem;
+}
+
+.s-row {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(6rem, auto) 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-top: 1px solid #e6e6e6;
+}
+
+.s-row b {
+  color: #e8632c;
+}
+
+.s-row em {
+  color: #666;
+  font-style: normal;
+  font-size: 0.92rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  .s-lead,
+  .s-name,
+  .s-row em {
+    color: #aaa;
+  }
+  .s-row {
+    border-top-color: #333;
+  }
+}

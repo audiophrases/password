@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Password — play</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="student.css" />
+</head>
+<body class="student">
+  <!-- The student page loads NONE of the setup code: no library, no editor, no
+       import/export, no library key. There is nothing here to lock down,
+       because none of it is in the document in the first place. -->
+
+  <!-- 1 · enter a code (skipped when the link already carries ?code=) -->
+  <section id="s-join" class="s-card hidden">
+    <h1>Password</h1>
+    <p class="s-lead">Enter the code your teacher gave you.</p>
+    <form id="s-join-form" class="s-joinrow">
+      <input id="s-code" class="mono" inputmode="latin" autocomplete="off" autocapitalize="off"
+             spellcheck="false" maxlength="8" placeholder="abcd2345" aria-label="Assignment code" />
+      <button class="btn" type="submit">Go</button>
+    </form>
+    <p id="s-join-msg" class="msg"></p>
+  </section>
+
+  <!-- 2 · the round, before it starts -->
+  <section id="s-ready" class="s-card hidden">
+    <h1 id="s-title">…</h1>
+    <p id="s-rules" class="s-lead"></p>
+    <label class="s-name">Your name (just for the screen)
+      <input id="s-player" maxlength="20" autocomplete="off" placeholder="optional" />
+    </label>
+    <button id="s-start" class="btn s-big">▶ Start</button>
+    <p class="hint">Nothing you do here is sent to your teacher.</p>
+  </section>
+
+  <!-- 3 · playing -->
+  <section id="s-play" class="hidden">
+    <div id="s-circle-wrap" class="s-circle-wrap"></div>
+    <div class="s-hud">
+      <div id="s-letter" class="s-letter">A</div>
+      <p id="s-clue" class="s-clue"></p>
+    </div>
+    <form id="s-answer-form" class="s-answerrow">
+      <input id="s-answer" autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="Type your answer" aria-label="Your answer" />
+      <button id="s-enter" class="btn" type="submit">Enter</button>
+      <button id="s-talk" class="btn ghost hidden" type="button">🎤 Hold to talk</button>
+      <button id="s-pass" class="btn ghost" type="button">Pass</button>
+    </form>
+    <div class="s-controls">
+      <button id="s-hear" class="btn ghost" type="button">🔊 Hear the clue</button>
+      <button id="s-quit" class="btn ghost" type="button">Finish</button>
+    </div>
+    <p id="s-feedback" class="msg"></p>
+  </section>
+
+  <!-- 4 · results, for the student's eyes only -->
+  <section id="s-done" class="s-card hidden">
+    <h1>Round finished</h1>
+    <p id="s-score" class="s-score"></p>
+    <div id="s-review" class="s-review"></div>
+    <button id="s-again" class="btn s-big">↻ Play again</button>
+  </section>
+
+  <script type="module" src="js/student.js"></script>
+</body>
+</html>

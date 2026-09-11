@@ -401,3 +401,22 @@ body.armed .suggestion { display: none; }
   margin-top: 0.4rem;
   word-break: break-word;
 }
+
+/* Student assignments: the share code, the link, and this browser's own list. */
+.assign-out { margin-top: 0.6rem; }
+.assign-code { font-size: 1.05rem; margin: 0 0 0.4rem; }
+.assign-code b { font-size: 1.5rem; letter-spacing: 0.12em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.assign-h { font-size: 0.95rem; margin: 1rem 0 0.4rem; color: #666; }
+.assign-list { margin-top: 0.2rem; }
+.assign-row { display: flex; gap: 0.4rem; align-items: stretch; margin-bottom: 0.3rem; }
+.assign-open { flex: 1; display: flex; gap: 0.6rem; align-items: baseline; text-align: left;
+  background: #fafafa; border: 1px solid #e2e2e2; border-radius: 6px; padding: 0.4rem 0.6rem; cursor: pointer; }
+.assign-open b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.06em; }
+.assign-open span { flex: 1; }
+.assign-open em { font-style: normal; color: #777; font-size: 0.85rem; }
+.assign-del { border: 1px solid #e2e2e2; border-radius: 6px; background: #fafafa; cursor: pointer; padding: 0 0.6rem; }
+#assign-url { flex: 1 1 18rem; font-size: 0.85rem; }
+@media (prefers-color-scheme: dark) {
+  .assign-open, .assign-del { background: #1e1e1e; border-color: #333; }
+  .assign-h, .assign-open em { color: #999; }
+}

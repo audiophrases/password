@@ -21,7 +21,8 @@
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "RelayRoom" },
-      { "name": "LIBRARY", "class_name": "Library" }
+      { "name": "LIBRARY", "class_name": "Library" },
+      { "name": "ASSIGN", "class_name": "Assignment" }
     ]
   },
   // A migration tag records what has already been applied, so "Library" cannot
@@ -29,7 +30,8 @@
   // and leaves RelayRoom and its data alone.
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["RelayRoom"] },
-    { "tag": "v2", "new_sqlite_classes": ["Library"] }
+    { "tag": "v2", "new_sqlite_classes": ["Library"] },
+    { "tag": "v3", "new_sqlite_classes": ["Assignment"] }
   ],
   "observability": { "enabled": true }
 }

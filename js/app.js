@@ -1245,6 +1245,162 @@ function bindLibrarySync() {
 
   $('library-sync')?.addEventListener('click', () => runSync(true));
 }
+// ---------- Assign a game to students ----------
+// An assignment is a frozen COPY of one round living under a short share code
+// (relay/assign.js). Students read it with the code alone — the library key
+// never leaves this machine, so there is no path from a student link back to
+// the library, the editor, or any other game.
+
+const ASSIGN_KEY = 'password.assignments.v1'; // this browser's own links, for re-finding and revoking
+
+function loadAssignments() {
+  try {
+    return JSON.parse(localStorage.getItem(ASSIGN_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAssignments(list) {
+  try {
+    localStorage.setItem(ASSIGN_KEY, JSON.stringify(list.slice(0, 50)));
+  } catch {
+    /* quota — the list is a convenience, the links work without it */
+  }
+}
+
+const studentUrl = (code) => `${state.cloudOrigin}/student?code=${code}`;
+
+function renderAssignments() {
+  const box = $('assign-list');
+  if (!box) return;
+  const list = loadAssignments();
+  if (!list.length) {
+    box.innerHTML = '';
+    return;
+  }
+  box.innerHTML = '<h3 class="assign-h">Links you have made</h3>';
+  for (const a of list) {
+    const row = document.createElement('div');
+    row.className = 'assign-row';
+    const when = new Date(a.createdAt).toLocaleDateString();
+    row.innerHTML =
+      `<button class="assign-open" title="Show this link again"><b>${esc(a.code)}</b> <span>${esc(a.title)}</span>` +
+      `<em>${esc(a.mode === 'voice-auto' ? 'voice' : 'typed')} · ${esc(when)}</em></button>` +
+      `<button class="assign-del" title="Revoke — the link stops working">🚫</button>`;
+    row.querySelector('.assign-open').addEventListener('click', () => showAssignment(a));
+    row.querySelector('.assign-del').addEventListener('click', () => revokeAssignment(a.code));
+    box.appendChild(row);
+  }
+}
+
+function showAssignment(a) {
+  $('assign-code').textContent = a.code;
+  $('assign-url').value = studentUrl(a.code);
+  $('assign-out').classList.remove('hidden');
+  const qr = $('assign-qr');
+  qr.innerHTML = '';
+  if (!window.qrcode) return;
+  // Same vendored offline generator as the phone-remote pairing QR (renderQR).
+  try {
+    const q = window.qrcode(0, 'M');
+    q.addData(studentUrl(a.code));
+    q.make();
+    qr.innerHTML = `<img alt="Scan to open the student game" src="${q.createDataURL(5, 8)}" />`;
+  } catch (e) {
+    console.warn('QR generation failed:', e); // the code and link are still on screen
+  }
+}
+
+async function createAssignment() {
+  const msg = $('assign-msg');
+  const key = getLibraryKey();
+  if (!state.data) {
+    msg.className = 'msg error';
+    msg.textContent = 'Open or import a game first — the loaded game is the one that gets assigned.';
+    return;
+  }
+  if (!state.cloudOrigin) {
+    msg.className = 'msg error';
+    msg.textContent = 'No cloud relay set on this computer — students need one to reach the game. See the ☁ Phone remote box below.';
+    return;
+  }
+  if (!key) {
+    msg.className = 'msg error';
+    msg.textContent = 'Generate a library key first (🔑 Cloud library above) — it is what proves the assignment is yours.';
+    return;
+  }
+  msg.className = 'msg';
+  msg.textContent = 'Creating the link…';
+  try {
+    const res = await fetch(`${state.cloudOrigin}/api/assign`, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        game: state.data,
+        settings: {
+          mode: $('assign-mode').value,
+          durationSec: Math.max(0, Math.floor(+$('assign-duration').value) || 0),
+          strictness: parseFloat($('strictness')?.value) || 0.7,
+        },
+        expiresInDays: Math.max(0, Math.floor(+$('assign-expiry').value) || 0),
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Could not create the link (${res.status}).`);
+    const entry = {
+      code: body.code,
+      title: body.title,
+      mode: body.settings.mode,
+      createdAt: Date.now(),
+    };
+    saveAssignments([entry, ...loadAssignments().filter((a) => a.code !== entry.code)]);
+    renderAssignments();
+    showAssignment(entry);
+    msg.className = 'msg ok';
+    msg.textContent = `“${body.title}” is ready for students.`;
+  } catch (e) {
+    msg.className = 'msg error';
+    msg.textContent = e.message;
+  }
+}
+
+async function revokeAssignment(code) {
+  if (!confirm(`Revoke code ${code}? Students using that link will not be able to open it again.`)) return;
+  const msg = $('assign-msg');
+  const key = getLibraryKey();
+  try {
+    const res = await fetch(`${state.cloudOrigin}/api/assign?code=${encodeURIComponent(code)}`, {
+      method: 'DELETE',
+      credentials: 'omit',
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not revoke it.');
+    saveAssignments(loadAssignments().filter((a) => a.code !== code));
+    renderAssignments();
+    $('assign-out').classList.add('hidden');
+    msg.className = 'msg ok';
+    msg.textContent = `Code ${code} no longer works.`;
+  } catch (e) {
+    msg.className = 'msg error';
+    msg.textContent = e.message;
+  }
+}
+
+function bindAssign() {
+  if (isPlayMode) return;
+  $('assign-create')?.addEventListener('click', createAssignment);
+  $('assign-copy')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('assign-url').value);
+      flash($('assign-copy'), 'Copied!');
+    } catch {
+      $('assign-url').select(); // clipboard needs a secure context
+    }
+  });
+  renderAssignments();
+}
 // ---------- Results history (browser storage) ----------
 // Every finished round is recorded so difficult words can be reviewed later —
 // and turned into a fresh "review round" with one click.
@@ -2467,6 +2623,7 @@ bindAppend();
 renderHistory();
 const remoteReady = initRemoteLink(); // resolves once we know whether the neural server is up
 bindLibrarySync();
+bindAssign();
 // Only after initRemoteLink has resolved the Worker origin — and never in the
 // projector tab, which must make no network calls mid-lesson.
 if (!isPlayMode) remoteReady.then(() => runSync(false)).catch(() => {});

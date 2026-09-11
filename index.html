@@ -43,6 +43,34 @@
           </div>
           <div id="sync-status" class="hint sync-status"></div>
         </details>
+        <details id="assign-details" class="import">
+          <summary>👥 Give this game to students</summary>
+          <p class="hint">Makes a link and a code for the game loaded above. Students open it on their own Chromebook or laptop and play a <b>copy</b> — they never see your library, your other games, or the editor, and they cannot change anything. Needs a cloud relay and a library key (🔑 above).</p>
+          <div class="field-row">
+            <label>Answers
+              <select id="assign-mode">
+                <option value="type-in" selected>Type-in (works everywhere)</option>
+                <option value="voice-auto">Voice (speak the answer; needs Chrome/Edge + mic)</option>
+              </select>
+            </label>
+            <label>Time limit <input id="assign-duration" type="number" value="0" min="0" max="3600" step="30" title="Seconds. 0 = no timer." /></label>
+            <label>Expires in <input id="assign-expiry" type="number" value="0" min="0" max="365" title="Days. 0 = never expires." /> days</label>
+          </div>
+          <div class="field-row">
+            <button id="assign-create" class="btn">👥 Create student link</button>
+          </div>
+          <div id="assign-out" class="assign-out hidden">
+            <p class="assign-code">Code <b id="assign-code">…</b></p>
+            <div class="field-row">
+              <input id="assign-url" class="mono" readonly />
+              <button id="assign-copy" class="btn ghost">Copy link</button>
+            </div>
+            <div id="assign-qr" class="remote-qr"></div>
+            <p class="hint">Put this on the projector — students scan it, or type the code at the same address.</p>
+          </div>
+          <div id="assign-list" class="assign-list"></div>
+          <div id="assign-msg" class="msg"></div>
+        </details>
         <div id="validation" class="msg"></div>
         <details id="import-details" class="import">
           <summary>Import from a chatbot, file, or sample</summary>

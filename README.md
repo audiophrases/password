@@ -68,6 +68,8 @@ announced with the letter in the game's language — e.g. *"Begins with the lett
      a `.txt`/`.json` file, or the built-in sample. Imported games load immediately; Save to keep.
    - **⬇ Export all games** saves the whole library to one file, and **🔑 Cloud library** keeps it
      the same on every computer you teach from — see "Your games on every computer" below.
+   - **👥 Give this game to students** makes a link and code your class can play on their own
+     devices, with no access to your library — see "Student mode" below.
 
    Saved games persist across sessions in this browser. Renaming a game in the editor saves a
    *copy* and leaves the original alone, so a round is never overwritten by accident.
@@ -233,6 +235,47 @@ cloud is a mirror that catches up when it can.
   don't want.
 - Deleting a game deletes it everywhere on the next sync, so the 🗑 button asks first.
 
+## 👥 Student mode — give a game to the class
+
+Load a game, open **👥 Give this game to students** in section 2, and press **Create
+student link**. You get a short code and a link:
+
+```
+https://password-game.<you>.workers.dev/student?code=abcd2345
+```
+
+Put the QR on the projector. Students scan it, or open the same address and type the
+code. It works on a school Chromebook or any laptop — no install, no account, no sign-in.
+
+**What a student gets** is a single round and nothing else: the letter circle, the clue,
+a box to answer in, Pass, 🔊 to hear the clue again, and a score with the words they
+missed at the end. Nothing is sent back to you.
+
+**What a student cannot get to.** The student page (`student.html`) does not load the
+setup code at all — there is no library, no editor, no import/export and no library key
+in that page to begin with. On the wire the separation is the same: creating or revoking
+an assignment needs your **library key**, while a student only ever has a **share code**,
+and a share code can do exactly one thing — read that one round. It cannot list your
+library, reach another assignment, edit, or delete. A student who tries your library URL
+gets a 401.
+
+Notes:
+
+- **The assignment is a frozen copy.** Editing the round in your library afterwards does
+  not change what a class is part-way through playing. Assign it again to push changes.
+- **Answers:** *Type-in* works in every browser; *Voice* needs Chrome/Edge, a microphone
+  and internet, and falls back to typing if the browser can't listen. The other two modes
+  (voice-assist, teacher-judge) aren't offered — both wait for you to press a key, so a
+  student would sit in front of a round that never advances.
+- Typos and accents are forgiven by the same fuzzy/phonetic matcher you use in class; a
+  near miss is accepted and the correct spelling is shown.
+- **Time limit** `0` means no timer — usually right for homework. **Expires in** `0` days
+  means the link never expires.
+- Links you make are listed under the button. Click one to show its QR again, or 🚫 to
+  **revoke** it — the link stops working immediately, for everyone.
+- Anyone with the link can play the round, so treat it as "shared with the class". It
+  gives away nothing except that one set of words and clues.
+
 ## Game JSON schema
 
 Each letter has one or more **variants** — one per player, so students in the same room don't
@@ -280,7 +323,9 @@ one shared variant.
 | `js/link.js` | WebSocket client shared by the game and the remote |
 | `js/config.js` | optional baked-in cloud relay URL |
 | `js/library.js` | 🔑 cloud library: offline-first sync of the saved-games library |
+| `student.html` / `student.css` / `js/student.js` | 👥 student mode: the play-only page, loads no setup code |
 | `relay/worker.js` + `wrangler.jsonc` + `.assetsignore` | ☁ cloud relay: Cloudflare Worker (rooms as Durable Objects) that also serves the site |
 | `relay/library.js` | 🔑 cloud library: the saved games, as a Durable Object with SQLite |
+| `relay/assign.js` | 👥 student mode: one assigned round per share code, read-only to students |
 | `js/vendor/qrcode.js` | vendored MIT QR generator (offline) for the remote-pairing QR |
 | `sample-game.json` | a ready-to-play A2 round |

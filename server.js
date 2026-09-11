@@ -288,6 +288,7 @@ const server = http.createServer((req, res) => {
   let p = decodeURIComponent(u.pathname);
   if (p === '/') p = '/index.html';
   if (p === '/remote' || p === '/remote/') p = '/remote.html';
+  if (p === '/student' || p === '/student/') p = '/student.html';
   if (p === '/lan-info') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ip: lanIP(), port: Number(PORT) }));
