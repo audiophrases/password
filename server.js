@@ -21,8 +21,11 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 // Reverse-engineered Edge "Read Aloud" endpoint — no key, no dependency. Gives
 // the same neural voices as Edge (e.g. ca-ES-JoanaNeural), played in any browser.
 const TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
-const TTS_HOST = 'speech.platform.bing.com';
-const TTS_PATH = '/consumer/speech/synthesize/readaloud/edge/v1';
+// Edge moved Read Aloud to a new host in 2026-10 (rany2/edge-tts#490); the legacy
+// speech.platform.bing.com now answers 403 for many regions. The new host still
+// accepts the legacy Sec-MS-GEC token, with the key passed as Ocp-Apim-Subscription-Key.
+const TTS_HOST = 'api.msedgeservices.com';
+const TTS_PATH = '/tts/cognitiveservices/websocket/v1';
 const EDGE_VERSION = '143.0.3650.75';
 
 // Security token Microsoft now requires: SHA-256 of (Windows-filetime ticks
@@ -77,7 +80,7 @@ function synthesizeOnce(text, voice, skew, isSsml, rate, onFirstChunk, onChunk, 
   return new Promise((resolve, reject) => {
     const connId = crypto.randomUUID().replace(/-/g, '');
     const query =
-      `?TrustedClientToken=${TRUSTED_TOKEN}` +
+      `?Ocp-Apim-Subscription-Key=${TRUSTED_TOKEN}` +
       `&Sec-MS-GEC=${secMsGec(skew)}&Sec-MS-GEC-Version=1-${EDGE_VERSION}&ConnectionId=${connId}`;
     const key = crypto.randomBytes(16).toString('base64');
     const socket = tls.connect({ host: TTS_HOST, port: 443, servername: TTS_HOST }, () => {
